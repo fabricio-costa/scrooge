@@ -307,11 +307,54 @@ Repository files
   └─────────┘     └──────────┘     └──────────┘     └─────────┘     └─────────┘
 ```
 
-1. **Classify** — Detect file type (Kotlin, TypeScript, XML, Gradle, or generic)
-2. **Chunk** — Parse into semantic units using tree-sitter (Kotlin, TypeScript) or regex patterns. Each chunk represents a class, function, interface, enum, composable, XML resource, or Gradle block
-3. **Sketch** — Compress each chunk into a token-efficient summary preserving signatures and structure but dropping implementation details
-4. **Embed** — Compute 384-dimensional vectors using all-MiniLM-L6-v2 (runs locally, no API calls)
+1. **Classify** — Detect file type by extension (`.kt` → Kotlin, `.ts`/`.tsx` → TypeScript, `.xml` → XML, `.gradle.kts` → Gradle, everything else → generic)
+2. **Chunk** — Parse into semantic units. See [Supported Languages](#supported-languages) below
+3. **Sketch** — Compress each chunk into a token-efficient summary. See [Sketches](#sketches) below
+4. **Embed** — Compute vector embeddings for semantic search. See [Embeddings](#embeddings) below
 5. **Store** — Write chunks, sketches, and vectors to SQLite with FTS5 and sqlite-vec indexes
+
+### Supported languages
+
+| Language | Parser | Chunk kinds |
+|----------|--------|-------------|
+| **Kotlin** | tree-sitter AST | `class`, `viewmodel`, `composable`, `function`, `method`, `api_interface`, `dao`, `entity` |
+| **TypeScript/TSX** | tree-sitter AST | `class`, `function`, `method`, `interface`, `type_alias`, `enum` |
+| **XML** (Android) | Regex patterns | `manifest_component`, `nav_destination`, `layout`, `values` |
+| **Gradle** | Regex patterns | `gradle_plugins`, `gradle_android`, `gradle_dependencies`, `gradle_settings` |
+| **Other** | Line-based splitter | `generic_block`, `generic_file` |
+
+Tree-sitter chunkers extract semantic boundaries (class/function/interface declarations), while regex-based chunkers match structural patterns. Large classes (>400 lines) are automatically split into a class-level chunk plus individual method chunks.
+
+### Sketches
+
+Sketches are compressed representations of code chunks that preserve structure while dropping implementation details. They typically reduce token count by 80-90% compared to raw source.
+
+What a sketch preserves:
+- **Signatures** — function/method signatures, class declarations, type annotations
+- **Doc comments** — JSDoc (`/** */`) and KDoc comments
+- **Annotations** — `@HiltViewModel`, `@Composable`, `@GET`, etc.
+- **Class skeleton** — property declarations and method signatures (no bodies)
+- **Interface members** — property and method signatures
+- **Enum members** — member names and values
+
+Each sketch is capped at 200 tokens (configurable via `sketchMaxTokens`). Longer sketches are truncated with a `... (truncated)` marker.
+
+### Embeddings
+
+Scrooge uses [all-MiniLM-L6-v2](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2) via `@xenova/transformers` for local embedding generation — no external API calls, no network dependency.
+
+| Property | Value |
+|----------|-------|
+| Model | `Xenova/all-MiniLM-L6-v2` (quantized ONNX) |
+| Dimensions | 384 |
+| Pooling | Mean pooling over all output tokens |
+| Normalization | L2-normalized (unit vectors), enabling cosine similarity via dot product |
+| Runtime | In-process via ONNX Runtime (Node.js) |
+| First load | ~2-3s (model cached on disk after first download) |
+
+During indexing, Scrooge embeds each chunk's **sketch** (not the raw source). This is intentional — the sketch contains the semantic essence (signatures, names, structure) without implementation noise, producing higher-quality embeddings for code search.
+
+During search, the user's query is embedded with the same model and compared against all stored vectors using sqlite-vec's cosine distance.
 
 ### Search flow
 
@@ -341,10 +384,10 @@ Query
     (sketch or raw)
 ```
 
-1. **Lexical search** — FTS5 with CamelCase splitting for identifier-aware matching
-2. **Vector search** — Embed the query and find cosine-similar chunks via sqlite-vec
-3. **RRF Fusion** — Merge both ranked lists using Reciprocal Rank Fusion (k=60)
-4. **Packaging** — Select top results within the token budget, enforcing diversity (max 3 chunks per file) and deduplication
+1. **Lexical search** — FTS5 full-text search with BM25 ranking. Queries are tokenized with CamelCase splitting (`LoginViewModel` → `login OR view OR model OR loginviewmodel`) so both exact identifiers and sub-words match. Supports filtering by module, language, kind, and tags
+2. **Vector search** — The query is embedded with MiniLM-L6-v2 and compared against all chunk vectors via sqlite-vec cosine distance. Results are ranked by similarity (1 - distance). Same filters apply post-query
+3. **RRF Fusion** — Both ranked lists are merged using Reciprocal Rank Fusion: `score(doc) = Σ 1/(k + rank)` where `k=60`. Documents appearing in both lists accumulate scores from each, naturally rising to the top
+4. **Packaging** — Results are packed within a token budget (default 3000). A diversity constraint limits each file to at most 3 chunks, preventing a single large file from dominating results. In `sketch` view, the compressed sketch is returned; in `raw` view, full source code
 
 ## Configuration
 

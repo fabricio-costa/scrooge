@@ -8,6 +8,7 @@ import type { Chunk } from "./chunkers/types.js";
  * while removing implementation details.
  */
 export function generateSketch(chunk: Chunk): string {
+  const MAX_SKETCH_TOKENS = getConfig().sketchMaxTokens;
   const { kind, textRaw, signature, symbolName, annotations } = chunk;
 
   const parts: string[] = [];

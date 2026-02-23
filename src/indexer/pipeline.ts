@@ -80,56 +80,61 @@ export async function runPipeline(options: IndexOptions): Promise<IndexStats> {
   let chunksCreated = 0;
 
   for (const file of filesToProcess) {
-    let content: string;
     try {
-      content = readFileSync(join(repoPath, file), "utf-8");
-    } catch {
-      continue; // File might have been deleted
-    }
-
-    const language = classifyFile(file);
-    const chunker = chunkers.find((c) => c.supports(file, language));
-    if (!chunker) continue;
-
-    const chunks = chunker.chunk(file, content);
-
-    // Detect module from path (e.g., app/src/main/... → :app)
-    const module = detectModule(file);
-    const sourceSet = detectSourceSet(file);
-
-    for (const chunk of chunks) {
-      chunk.module = module;
-      chunk.sourceSet = sourceSet;
-
-      insertChunk(db, {
-        id: chunk.id,
-        repo_path: repoPath,
-        commit_sha: commitSha,
-        path: chunk.path,
-        module: chunk.module ?? null,
-        source_set: chunk.sourceSet ?? null,
-        language: chunk.language,
-        kind: chunk.kind,
-        symbol_name: chunk.symbolName ?? null,
-        symbol_fqname: chunk.symbolFqname ?? null,
-        signature: chunk.signature ?? null,
-        start_line: chunk.startLine,
-        end_line: chunk.endLine,
-        text_raw: chunk.textRaw,
-        text_sketch: chunk.textSketch,
-        tags: chunk.tags.length > 0 ? JSON.stringify(chunk.tags) : null,
-        annotations: chunk.annotations.length > 0 ? JSON.stringify(chunk.annotations) : null,
-        defines: chunk.defines.length > 0 ? JSON.stringify(chunk.defines) : null,
-        uses: chunk.uses.length > 0 ? JSON.stringify(chunk.uses) : null,
-        content_hash: chunk.contentHash,
-      });
-
-      if (withEmbeddings) {
-        const embedding = await embed(chunk.textSketch || chunk.textRaw);
-        insertVecEmbedding(db, chunk.id, embedding);
+      let content: string;
+      try {
+        content = readFileSync(join(repoPath, file), "utf-8");
+      } catch {
+        continue; // File might have been deleted
       }
 
-      chunksCreated++;
+      const language = classifyFile(file);
+      const chunker = chunkers.find((c) => c.supports(file, language));
+      if (!chunker) continue;
+
+      const chunks = chunker.chunk(file, content);
+
+      // Detect module from path (e.g., app/src/main/... → :app)
+      const module = detectModule(file);
+      const sourceSet = detectSourceSet(file);
+
+      for (const chunk of chunks) {
+        chunk.module = module;
+        chunk.sourceSet = sourceSet;
+
+        insertChunk(db, {
+          id: chunk.id,
+          repo_path: repoPath,
+          commit_sha: commitSha,
+          path: chunk.path,
+          module: chunk.module ?? null,
+          source_set: chunk.sourceSet ?? null,
+          language: chunk.language,
+          kind: chunk.kind,
+          symbol_name: chunk.symbolName ?? null,
+          symbol_fqname: chunk.symbolFqname ?? null,
+          signature: chunk.signature ?? null,
+          start_line: chunk.startLine,
+          end_line: chunk.endLine,
+          text_raw: chunk.textRaw,
+          text_sketch: chunk.textSketch,
+          tags: chunk.tags.length > 0 ? JSON.stringify(chunk.tags) : null,
+          annotations: chunk.annotations.length > 0 ? JSON.stringify(chunk.annotations) : null,
+          defines: chunk.defines.length > 0 ? JSON.stringify(chunk.defines) : null,
+          uses: chunk.uses.length > 0 ? JSON.stringify(chunk.uses) : null,
+          content_hash: chunk.contentHash,
+        });
+
+        if (withEmbeddings) {
+          const embedding = await embed(chunk.textSketch || chunk.textRaw);
+          insertVecEmbedding(db, chunk.id, embedding);
+        }
+
+        chunksCreated++;
+      }
+    } catch (err) {
+      console.error(`[scrooge] Error processing file ${file}:`, err);
+      continue;
     }
   }
 

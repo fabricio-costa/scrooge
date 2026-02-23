@@ -1,7 +1,8 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { openDb, type ChunkRow } from "../../storage/db.js";
+import { openDb, recordToolCall, type ChunkRow } from "../../storage/db.js";
 import { getConfig } from "../../utils/config.js";
+import { estimateTokens } from "../../utils/tokens.js";
 
 export function registerLookupTool(server: McpServer): void {
   server.tool(
@@ -13,6 +14,7 @@ export function registerLookupTool(server: McpServer): void {
       include_usages: z.boolean().optional().describe("Include chunks that reference this symbol (default true)"),
     },
     async ({ symbol, repo_path, include_usages }) => {
+      const startTime = Date.now();
       const repoPath = repo_path ?? process.cwd();
       const config = getConfig();
       const db = openDb(config.dbPath);
@@ -33,6 +35,7 @@ export function registerLookupTool(server: McpServer): void {
           definitions: definitions.map(formatChunk),
         };
 
+        let allUsages: ChunkRow[] = [];
         if (include_usages !== false) {
           // Find usages: chunks whose 'uses' field contains the symbol
           const usages = db
@@ -55,7 +58,7 @@ export function registerLookupTool(server: McpServer): void {
 
           // Merge and deduplicate
           const seenIds = new Set(usages.map((u) => u.id));
-          const allUsages = [...usages];
+          allUsages = [...usages];
           for (const u of ftsUsages) {
             if (!seenIds.has(u.id)) {
               allUsages.push(u);
@@ -66,11 +69,23 @@ export function registerLookupTool(server: McpServer): void {
           result.usages = allUsages.map(formatChunk);
         }
 
+        const responseText = JSON.stringify(result, null, 2);
+        const tokensRaw = [...definitions, ...allUsages].reduce((sum, c) => sum + estimateTokens(c.text_raw), 0);
+
+        recordToolCall(db, {
+          tool: "lookup",
+          repo_path: repoPath,
+          duration_ms: Date.now() - startTime,
+          tokens_sent: estimateTokens(responseText),
+          tokens_raw: tokensRaw,
+          metadata: { symbol, definitionCount: definitions.length, usageCount: allUsages.length },
+        });
+
         return {
           content: [
             {
               type: "text" as const,
-              text: JSON.stringify(result, null, 2),
+              text: responseText,
             },
           ],
         };

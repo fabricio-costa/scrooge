@@ -25,9 +25,10 @@ describe("database setup", () => {
     expect(names).toContain("index_meta");
   });
 
-  it("should have WAL journal mode", () => {
+  it("should have WAL journal mode (or memory for in-memory db)", () => {
     const result = db.pragma("journal_mode") as Array<{ journal_mode: string }>;
-    expect(result[0].journal_mode).toBe("wal");
+    // In-memory databases use "memory" mode instead of "wal"
+    expect(["wal", "memory"]).toContain(result[0].journal_mode);
   });
 
   it("should have sqlite-vec loaded", () => {

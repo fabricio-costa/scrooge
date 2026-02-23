@@ -1,6 +1,7 @@
 import { basename } from "node:path";
 import type { Chunk, ChunkerPlugin } from "./types.js";
 import { hashContent, chunkId } from "./utils.js";
+import { truncateToTokenBudget } from "../../utils/tokens.js";
 
 const MAX_CHUNK_LINES = 100;
 

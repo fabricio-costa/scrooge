@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">MyApp</string>
+    <string name="welcome_message">Welcome back!</string>
+    <string name="login_title">Sign In</string>
+    <string name="login_email_hint">Email address</string>
+    <string name="login_password_hint">Password</string>
+    <string name="login_button">Sign In</string>
+    <string name="register_button">Create Account</string>
+    <string name="forgot_password">Forgot password?</string>
+    <string name="logout_confirmation">Are you sure you want to sign out?</string>
+    <string name="settings_title">Settings</string>
+    <string name="profile_title">Profile</string>
+    <string name="add_item">Add new item</string>
+    <string name="empty_state">No items yet. Tap the + button to add one.</string>
+    <string name="error_network">Unable to connect. Please check your internet connection and try again.</string>
+    <string name="error_generic">Something went wrong. Please try again later.</string>
+    <string name="ok">OK</string>
+    <string name="cancel">Cancel</string>
+    <string name="retry">Retry</string>
+
+    <string-array name="sort_options">
+        <item>Date created</item>
+        <item>Date modified</item>
+        <item>Name (A-Z)</item>
+        <item>Name (Z-A)</item>
+        <item>Priority</item>
+    </string-array>
+
+    <string-array name="theme_options">
+        <item>System default</item>
+        <item>Light</item>
+        <item>Dark</item>
+    </string-array>
+
+    <plurals name="items_count">
+        <item quantity="zero">No items</item>
+        <item quantity="one">%d item</item>
+        <item quantity="other">%d items</item>
+    </plurals>
+
+    <plurals name="days_ago">
+        <item quantity="one">%d day ago</item>
+        <item quantity="other">%d days ago</item>
+    </plurals>
+</resources>

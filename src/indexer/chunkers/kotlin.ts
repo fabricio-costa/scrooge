@@ -41,6 +41,7 @@ function visitNode(
   for (const child of node.children) {
     switch (child.type) {
       case "class_declaration":
+      case "interface_declaration":
       case "object_declaration": {
         const chunk = processClass(child, filePath, lines, packageName, imports, parentClass);
         if (chunk) {

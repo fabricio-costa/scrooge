@@ -281,8 +281,13 @@ function classifyClassKind(
   }
   if (annotationTexts.some((a) => a.includes("Dao"))) return "dao";
   if (annotationTexts.some((a) => a.includes("Entity"))) return "entity";
-  if (text.includes("interface ") && annotationTexts.some((a) => a.includes("GET") || a.includes("POST") || a.includes("PUT") || a.includes("DELETE"))) {
-    return "api_interface";
+  if (node.type === "interface_declaration" || text.includes("interface ")) {
+    if (annotationTexts.some((a) => a.includes("GET") || a.includes("POST") || a.includes("PUT") || a.includes("DELETE"))
+        || text.includes("@GET") || text.includes("@POST") || text.includes("@PUT") || text.includes("@DELETE")) {
+      return "api_interface";
+    }
+    if (annotationTexts.some((a) => a.includes("Dao"))) return "dao";
+    return "class"; // plain interface, classified as class
   }
 
   return "class";

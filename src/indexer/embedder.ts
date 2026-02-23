@@ -10,9 +10,12 @@ let _embedder: FeatureExtractionPipeline | null = null;
 export async function initEmbedder(): Promise<void> {
   if (_embedder) return;
   const config = getConfig();
+  console.error(`[scrooge] Loading embedding model ${config.embeddingModel} ...`);
+  const start = Date.now();
   _embedder = await pipeline("feature-extraction", config.embeddingModel, {
     quantized: true,
   });
+  console.error(`[scrooge] Model loaded in ${((Date.now() - start) / 1000).toFixed(1)}s`);
 }
 
 /**

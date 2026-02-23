@@ -73,20 +73,25 @@ export function lexicalSearch(
  * Splits CamelCase identifiers and creates an OR query.
  */
 function tokenizeQuery(query: string): string {
-  // Split camelCase/PascalCase
+  // Keep original query terms alongside CamelCase-split terms
+  const terms = new Set<string>();
+
+  // Add original words
+  const originalWords = query.split(/\s+/).filter((w) => w.length >= 2);
+  for (const w of originalWords) {
+    terms.add(w.toLowerCase());
+  }
+
+  // Split camelCase/PascalCase and add sub-terms
   const expanded = query.replace(/([a-z])([A-Z])/g, "$1 $2");
-
-  // Remove special characters, keep alphanumeric and spaces
   const cleaned = expanded.replace(/[^a-zA-Z0-9\s]/g, " ");
+  const subWords = cleaned.split(/\s+/).filter((w) => w.length >= 2);
+  for (const w of subWords) {
+    terms.add(w.toLowerCase());
+  }
 
-  // Split into words and filter short ones
-  const words = cleaned
-    .split(/\s+/)
-    .filter((w) => w.length >= 2)
-    .map((w) => `"${w}"`);
+  if (terms.size === 0) return "";
 
-  if (words.length === 0) return "";
-
-  // FTS5 OR query
-  return words.join(" OR ");
+  // FTS5: use unquoted terms for prefix matching and OR for combining
+  return [...terms].join(" OR ");
 }

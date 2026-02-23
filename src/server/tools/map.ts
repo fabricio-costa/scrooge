@@ -1,9 +1,10 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { openDb } from "../../storage/db.js";
+import { openDb, recordToolCall } from "../../storage/db.js";
 import { getConfig } from "../../utils/config.js";
 import { generateTree, renderTree } from "../../repomap/tree.js";
 import { getModuleSummaries, getFileSummaries } from "../../repomap/summaries.js";
+import { estimateTokens } from "../../utils/tokens.js";
 
 export function registerMapTool(server: McpServer): void {
   server.tool(
@@ -15,6 +16,7 @@ export function registerMapTool(server: McpServer): void {
       module: z.string().optional().describe("Focus on a specific module (e.g., ':app', ':core:common')"),
     },
     async ({ repo_path, level, module }) => {
+      const startTime = Date.now();
       const repoPath = repo_path ?? process.cwd();
       const config = getConfig();
       const db = openDb(config.dbPath);
@@ -24,7 +26,6 @@ export function registerMapTool(server: McpServer): void {
         const output: string[] = [];
 
         if (detailLevel === "repo") {
-          // Compact tree (collapsed at depth 3) + module summaries
           const tree = generateTree(db, repoPath, module);
           output.push("## Directory Tree\n```");
           output.push(renderTree(tree, { maxDepth: 3 }));
@@ -44,7 +45,6 @@ export function registerMapTool(server: McpServer): void {
             }
           }
         } else if (detailLevel === "modules") {
-          // Module summaries only — no tree, compact output
           const modules = getModuleSummaries(db, repoPath);
           if (modules.length > 0) {
             output.push("## Modules\n");
@@ -61,7 +61,6 @@ export function registerMapTool(server: McpServer): void {
             output.push("No modules detected. Files may not follow the `<module>/src/` convention.");
           }
         } else if (detailLevel === "files") {
-          // Per-file symbols — full tree when module-filtered, collapsed otherwise
           const tree = generateTree(db, repoPath, module);
           output.push("## Directory Tree\n```");
           output.push(renderTree(tree, module ? undefined : { maxDepth: 3 }));
@@ -79,11 +78,32 @@ export function registerMapTool(server: McpServer): void {
           }
         }
 
+        const outputText = output.join("\n");
+        const tokensSent = estimateTokens(outputText);
+
+        // Compute raw tokens: sum of text_raw for all chunks in scope
+        const moduleFilter = module ? "AND module = ?" : "";
+        const params: unknown[] = [repoPath];
+        if (module) params.push(module);
+        const rawRow = db
+          .prepare(`SELECT COALESCE(SUM(LENGTH(text_raw)), 0) as total_len FROM chunks WHERE repo_path = ? ${moduleFilter}`)
+          .get(...params) as { total_len: number };
+        const tokensRaw = Math.ceil(rawRow.total_len / 4);
+
+        recordToolCall(db, {
+          tool: "map",
+          repo_path: repoPath,
+          duration_ms: Date.now() - startTime,
+          tokens_sent: tokensSent,
+          tokens_raw: tokensRaw,
+          metadata: { level: detailLevel, module: module ?? null },
+        });
+
         return {
           content: [
             {
               type: "text" as const,
-              text: output.join("\n"),
+              text: outputText,
             },
           ],
         };

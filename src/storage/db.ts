@@ -80,23 +80,51 @@ export function openDb(dbPath?: string): Database.Database {
   return db;
 }
 
+const TOOL_CALLS_SQL = `
+CREATE TABLE IF NOT EXISTS tool_calls (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  tool TEXT NOT NULL,
+  repo_path TEXT NOT NULL,
+  called_at TEXT DEFAULT (datetime('now')),
+  duration_ms INTEGER,
+  tokens_sent INTEGER DEFAULT 0,
+  tokens_raw INTEGER DEFAULT 0,
+  metadata TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_tool_calls_repo ON tool_calls(repo_path, called_at);
+CREATE INDEX IF NOT EXISTS idx_tool_calls_tool ON tool_calls(tool, called_at);
+`;
+
 export function runMigrations(db: Database.Database): void {
   const currentVersion = (db.pragma("user_version") as Array<{ user_version: number }>)[0].user_version;
   if (currentVersion >= SCHEMA_VERSION) return;
 
-  const statements = splitStatements(SCHEMA_SQL);
-
-  db.transaction(() => {
-    for (const stmt of statements) {
-      const trimmed = stmt.trim();
-      if (trimmed) {
-        db.exec(trimmed);
+  if (currentVersion < 1) {
+    const statements = splitStatements(SCHEMA_SQL);
+    db.transaction(() => {
+      for (const stmt of statements) {
+        const trimmed = stmt.trim();
+        if (trimmed) {
+          db.exec(trimmed);
+        }
       }
-    }
-  })();
+    })();
 
-  // Create the vec table separately (virtual tables can't be in transactions easily)
-  ensureVecTable(db);
+    // Create the vec table separately (virtual tables can't be in transactions easily)
+    ensureVecTable(db);
+  }
+
+  if (currentVersion < 2) {
+    const statements = splitStatements(TOOL_CALLS_SQL);
+    db.transaction(() => {
+      for (const stmt of statements) {
+        const trimmed = stmt.trim();
+        if (trimmed) {
+          db.exec(trimmed);
+        }
+      }
+    })();
+  }
 
   db.pragma(`user_version = ${SCHEMA_VERSION}`);
 }

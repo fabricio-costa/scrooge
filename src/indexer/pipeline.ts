@@ -6,7 +6,7 @@ import { kotlinChunker } from "./chunkers/kotlin.js";
 import { xmlAndroidChunker } from "./chunkers/xml-android.js";
 import { gradleChunker } from "./chunkers/gradle.js";
 import { genericChunker } from "./chunkers/generic.js";
-import type { Chunk, ChunkerPlugin } from "./chunkers/types.js";
+import type { ChunkerPlugin } from "./chunkers/types.js";
 import { embed } from "./embedder.js";
 import {
   insertChunk,

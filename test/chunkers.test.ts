@@ -22,15 +22,21 @@ describe("kotlin chunker", () => {
     const content = fixture("LoginViewModel.kt");
     const chunks = kotlinChunker.chunk("app/src/main/LoginViewModel.kt", content);
 
-    expect(chunks.length).toBeGreaterThanOrEqual(1);
+    // LoginViewModel + LoginUiState sealed class = 2 chunks
+    expect(chunks.length).toBe(2);
 
     const classChunk = chunks.find((c) => c.kind === "viewmodel");
     expect(classChunk).toBeDefined();
     expect(classChunk!.symbolName).toBe("LoginViewModel");
+    expect(classChunk!.startLine).toBe(14);
+    expect(classChunk!.endLine).toBe(61);
     expect(classChunk!.tags).toContain("hilt");
+    expect(classChunk!.tags).toContain("state");
     expect(classChunk!.annotations).toContain("@HiltViewModel");
-    expect(classChunk!.textSketch).toBeTruthy();
-    expect(classChunk!.contentHash).toBeTruthy();
+    expect(classChunk!.textSketch).toContain("authenticate");
+    expect(classChunk!.defines).toContain("com.example.app.ui.login.LoginViewModel");
+    expect(classChunk!.uses.length).toBeGreaterThan(0);
+    expect(classChunk!.contentHash).toMatch(/^[a-f0-9]{16}$/);
   });
 
   it("should extract package-qualified names", () => {
@@ -41,39 +47,49 @@ describe("kotlin chunker", () => {
     expect(classChunk!.symbolFqname).toBe("com.example.app.ui.login.LoginViewModel");
   });
 
-  it("should chunk ApiService as api_interface", () => {
+  it("should chunk ApiService as api_interface (interface_declaration)", () => {
     const content = fixture("ApiService.kt");
     const chunks = kotlinChunker.chunk("ApiService.kt", content);
 
-    // Should have at least the interface
-    expect(chunks.length).toBeGreaterThanOrEqual(1);
-    // The top-level interface - it might be detected differently
+    expect(chunks.length).toBe(1);
     const interfaceChunk = chunks[0];
-    expect(interfaceChunk).toBeDefined();
     expect(interfaceChunk.symbolName).toBe("ApiService");
+    expect(interfaceChunk.kind).toBe("api_interface");
+    expect(interfaceChunk.symbolFqname).toBe("com.example.app.data.api.ApiService");
+    expect(interfaceChunk.startLine).toBe(12);
+    expect(interfaceChunk.endLine).toBe(25);
+    expect(interfaceChunk.textSketch).toContain("login");
   });
 
   it("should chunk UserDao with entity and dao", () => {
     const content = fixture("UserDao.kt");
     const chunks = kotlinChunker.chunk("UserDao.kt", content);
 
+    expect(chunks.length).toBe(2);
+
     const entityChunk = chunks.find((c) => c.symbolName === "UserEntity");
     expect(entityChunk).toBeDefined();
     expect(entityChunk!.kind).toBe("entity");
+    expect(entityChunk!.tags).toContain("room");
+    expect(entityChunk!.startLine).toBe(10);
 
     const daoChunk = chunks.find((c) => c.symbolName === "UserDao");
     expect(daoChunk).toBeDefined();
     expect(daoChunk!.kind).toBe("dao");
+    expect(daoChunk!.tags).toContain("room");
+    expect(daoChunk!.textSketch).toContain("getUser");
   });
 
   it("should chunk LoginScreen as composable", () => {
     const content = fixture("LoginScreen.kt");
     const chunks = kotlinChunker.chunk("LoginScreen.kt", content);
 
-    const composable = chunks.find((c) => c.kind === "composable");
-    expect(composable).toBeDefined();
-    expect(composable!.symbolName).toBe("LoginScreen");
-    expect(composable!.tags).toContain("compose");
+    expect(chunks.length).toBe(1);
+    const composable = chunks[0];
+    expect(composable.kind).toBe("composable");
+    expect(composable.symbolName).toBe("LoginScreen");
+    expect(composable.tags).toContain("compose");
+    expect(composable.startLine).toBe(15);
   });
 
   it("should have valid chunk IDs", () => {
@@ -84,6 +100,35 @@ describe("kotlin chunker", () => {
       expect(chunk.id).toMatch(/^[a-f0-9]{24}$/);
       expect(chunk.contentHash).toMatch(/^[a-f0-9]{16}$/);
     }
+  });
+
+  it("should split large classes into class + method chunks", () => {
+    const content = fixture("LargeClass.kt");
+    const chunks = kotlinChunker.chunk("app/src/main/DashboardViewModel.kt", content);
+
+    // Should have the main class chunk + individual method chunks
+    const classChunk = chunks.find((c) => c.kind === "viewmodel");
+    expect(classChunk).toBeDefined();
+    expect(classChunk!.symbolName).toBe("DashboardViewModel");
+
+    // Methods should be extracted separately
+    const methodChunks = chunks.filter((c) => c.kind === "function" || c.kind === "method" || c.kind === "composable");
+    expect(methodChunks.length).toBeGreaterThan(0);
+    expect(chunks.length).toBeGreaterThan(2);
+  });
+
+  it("should chunk HiltModule with DI annotations", () => {
+    const content = fixture("HiltModule.kt");
+    const chunks = kotlinChunker.chunk("di/HiltModule.kt", content);
+
+    // Should detect the module objects and abstract class
+    expect(chunks.length).toBeGreaterThanOrEqual(2);
+
+    const networkModule = chunks.find((c) => c.symbolName === "NetworkModule");
+    expect(networkModule).toBeDefined();
+
+    const repoModule = chunks.find((c) => c.symbolName === "RepositoryModule");
+    expect(repoModule).toBeDefined();
   });
 });
 

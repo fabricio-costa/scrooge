@@ -247,9 +247,14 @@ describe("vector search via chunks_vec", () => {
     insertChunk(db, makeChunk({ id: "medium", symbol_name: "Medium", text_raw: "medium match" }));
     insertChunk(db, makeChunk({ id: "far", symbol_name: "Far", text_raw: "far match" }));
 
-    // Embeddings: close is in dim 0, medium in dim 1, far in dim 2
+    // close: same direction as query (dim 0)
     insertVecEmbedding(db, "close", syntheticEmbedding(0));
-    insertVecEmbedding(db, "medium", syntheticEmbedding(1));
+    // medium: partial overlap with query (dims 0 and 1)
+    const medEmb = new Float32Array(384);
+    medEmb[0] = 0.5;
+    medEmb[1] = 0.866; // ~30 degrees from query
+    insertVecEmbedding(db, "medium", medEmb);
+    // far: orthogonal to query (dim 2 only)
     insertVecEmbedding(db, "far", syntheticEmbedding(2));
 
     // Query embedding points in dim 0 -- "close" should be nearest

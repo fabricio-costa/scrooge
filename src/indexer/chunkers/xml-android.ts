@@ -42,8 +42,6 @@ function chunkManifest(filePath: string, content: string): Chunk[] {
     { regex: /<provider[\s\S]*?(?:\/>|<\/provider>)/g, kind: "manifest_component" as ChunkKind },
   ];
 
-  const lines = content.split("\n");
-
   for (const { regex, kind } of componentPatterns) {
     let match: RegExpExecArray | null;
     while ((match = regex.exec(content)) !== null) {

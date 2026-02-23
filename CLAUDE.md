@@ -106,9 +106,37 @@ Get information about the current index state.
 |-------------|--------|----------|-------------|
 | `repo_path` | string | no       | Path to the repository |
 
+### scrooge_statistics
+
+Usage and token savings metrics. Shows how much Scrooge saves by comparing compressed responses to raw content costs.
+
+**Parameters:**
+| Parameter   | Type   | Required | Description |
+|-------------|--------|----------|-------------|
+| `repo_path` | string | no       | Path to the repository |
+| `period`    | string | no       | `"today"`, `"week"`, `"month"`, `"all"` (default: `"all"`) |
+
+**Example output:**
+```
+## Scrooge Statistics — kotlin-pdv
+Period: all time (since Feb 20, 2026)
+
+### Token Savings
+Tokens delivered: 45,200
+Raw equivalent:  312,000
+Saved:           266,800 (85.5%)
+
+### Usage (70 total calls)
+search: 42 | map: 15 | lookup: 8 | reindex: 3 | status: 2
+
+### Search Insights
+Avg results/query: 5.2 | Avg tokens/query: 1,076
+Sources: lexical 30% | vector 25% | both 45%
+```
+
 ## Architecture
 
-- **MCP Server** (`src/server/`): Stdio transport, 5 tools (search, map, lookup, reindex, status)
+- **MCP Server** (`src/server/`): Stdio transport, 6 tools (search, map, lookup, reindex, status, statistics)
 - **Indexer** (`src/indexer/`): Pipeline that classifies files, chunks them semantically (tree-sitter for Kotlin), generates sketches, and computes embeddings
 - **Retrieval** (`src/retrieval/`): Hybrid search (FTS5 lexical + sqlite-vec vector) with RRF fusion and token-budgeted packaging
 - **Repo Map** (`src/repomap/`): Directory tree and hierarchical summaries from indexed data

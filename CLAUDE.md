@@ -21,9 +21,14 @@ npm run build
 
 ## Register as MCP Server in Claude Code
 
+The launcher script (`bin/scrooge-mcp.mjs`) auto-detects Node.js version mismatches and rebuilds native modules when needed. Register at **user scope** so it works from all projects:
+
 ```bash
-# Production (after build):
-claude mcp add scrooge -- node /absolute/path/to/scrooge/dist/index.js
+# Build first:
+npm run build
+
+# Register (user scope — available in all projects):
+claude mcp add -s user scrooge -- node /absolute/path/to/scrooge/bin/scrooge-mcp.mjs
 
 # Development:
 claude mcp add scrooge -- npx tsx /absolute/path/to/scrooge/src/index.ts

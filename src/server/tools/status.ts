@@ -1,6 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { openDb, getIndexMeta } from "../../storage/db.js";
+import { openDb, getIndexMeta, recordToolCall } from "../../storage/db.js";
 import { getConfig } from "../../utils/config.js";
 import { isGitRepo, getHeadCommit } from "../../utils/git.js";
 
@@ -12,6 +12,7 @@ export function registerStatusTool(server: McpServer): void {
       repo_path: z.string().describe("Absolute path to the repository (defaults to cwd)").optional(),
     },
     async ({ repo_path }) => {
+      const startTime = Date.now();
       const repoPath = repo_path ?? process.cwd();
       const config = getConfig();
       const db = openDb(config.dbPath);
@@ -20,6 +21,15 @@ export function registerStatusTool(server: McpServer): void {
         const meta = getIndexMeta(db, repoPath);
 
         if (!meta) {
+          recordToolCall(db, {
+            tool: "status",
+            repo_path: repoPath,
+            duration_ms: Date.now() - startTime,
+            tokens_sent: 0,
+            tokens_raw: 0,
+            metadata: { freshness: "not_indexed" },
+          });
+
           return {
             content: [
               {
@@ -43,6 +53,15 @@ export function registerStatusTool(server: McpServer): void {
           const currentCommit = getHeadCommit(repoPath);
           freshness = currentCommit === meta.last_commit_sha ? "up_to_date" : "stale";
         }
+
+        recordToolCall(db, {
+          tool: "status",
+          repo_path: repoPath,
+          duration_ms: Date.now() - startTime,
+          tokens_sent: 0,
+          tokens_raw: 0,
+          metadata: { freshness },
+        });
 
         return {
           content: [

@@ -29,7 +29,7 @@ export async function embed(text: string): Promise<Float32Array> {
     normalize: true,
   });
 
-  return new Float32Array(result.data);
+  return new Float32Array(result.data as ArrayLike<number>);
 }
 
 /**

@@ -38,6 +38,3 @@ export function getConfig(overrides?: Partial<ScroogeConfig>): ScroogeConfig {
   return _config;
 }
 
-export function resetConfig(): void {
-  _config = null;
-}

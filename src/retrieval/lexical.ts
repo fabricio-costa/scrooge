@@ -1,19 +1,8 @@
 import type Database from "better-sqlite3";
 import type { ChunkRow } from "../storage/db.js";
+import type { SearchFilter, SearchResult } from "./types.js";
 
-export interface SearchFilter {
-  module?: string;
-  language?: string;
-  kind?: string;
-  tags?: string[];
-}
-
-export interface SearchResult {
-  chunk: ChunkRow;
-  score: number;
-  source: "lexical" | "vector" | "both";
-  rank: number;
-}
+export type { SearchFilter, SearchResult };
 
 /**
  * Perform lexical search using FTS5 with BM25 ranking.

@@ -375,11 +375,3 @@ function getNodeText(node: Parser.SyntaxNode, lines: string[]): string {
   return lines.slice(node.startPosition.row, node.endPosition.row + 1).join("\n");
 }
 
-function hashContent(text: string): string {
-  return createHash("sha256").update(text).digest("hex").slice(0, 16);
-}
-
-function chunkId(filePath: string, startLine: number, endLine: number, contentHash: string): string {
-  const input = `${filePath}:${startLine}:${endLine}:${contentHash}`;
-  return createHash("sha256").update(input).digest("hex").slice(0, 24);
-}

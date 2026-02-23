@@ -1,6 +1,6 @@
-import { createHash } from "node:crypto";
 import { basename } from "node:path";
 import type { Chunk, ChunkKind, ChunkerPlugin } from "./types.js";
+import { hashContent, chunkId } from "./utils.js";
 
 export const xmlAndroidChunker: ChunkerPlugin = {
   id: "xml-android",

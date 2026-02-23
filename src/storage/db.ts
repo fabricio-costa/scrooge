@@ -151,13 +151,6 @@ function splitStatements(sql: string): string[] {
   return statements;
 }
 
-export function closeDb(): void {
-  if (_db) {
-    _db.close();
-    _db = null;
-  }
-}
-
 export interface IndexMeta {
   repo_path: string;
   last_commit_sha: string | null;

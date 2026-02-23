@@ -41,9 +41,19 @@ export interface IndexOptions {
   withEmbeddings: boolean;
 }
 
+function log(msg: string): void {
+  console.error(`[scrooge] ${msg}`);
+}
+
+function elapsed(startMs: number): string {
+  return ((Date.now() - startMs) / 1000).toFixed(1) + "s";
+}
+
 export async function runPipeline(options: IndexOptions): Promise<IndexStats> {
   const { repoPath, db, incremental, withEmbeddings } = options;
   const start = Date.now();
+
+  log(`Starting ${incremental ? "incremental" : "full"} index of ${repoPath}`);
 
   const commitSha = getHeadCommit(repoPath);
   let filesToProcess: string[];
@@ -59,6 +69,8 @@ export async function runPipeline(options: IndexOptions): Promise<IndexStats> {
       const deletedFiles = getDeletedFiles(repoPath, meta.last_commit_sha, commitSha);
       const deletedSet = new Set(deletedFiles);
 
+      log(`Incremental: ${changedFiles.length} changed, ${deletedFiles.length} deleted since ${meta.last_commit_sha.slice(0, 8)}`);
+
       // Remove chunks for changed/deleted files
       for (const file of [...changedFiles, ...deletedFiles]) {
         const ids = getChunkIdsByPath(db, repoPath, file);
@@ -72,13 +84,14 @@ export async function runPipeline(options: IndexOptions): Promise<IndexStats> {
       // Only process changed files (not deleted)
       filesToProcess = filterFiles(changedFiles.filter((f) => !deletedSet.has(f)));
     } else {
-      // No previous index: full index
+      log("No previous index found, falling back to full index");
       filesToProcess = filterFiles(getTrackedFiles(repoPath));
     }
   } else {
     // Full re-index: clear existing chunks to avoid orphans from deleted files
     const existingIds = (db.prepare("SELECT id FROM chunks WHERE repo_path = ?").all(repoPath) as Array<{ id: string }>).map((r) => r.id);
     if (existingIds.length > 0) {
+      log(`Clearing ${existingIds.length} existing chunks`);
       deleteVecByIds(db, existingIds);
       deleteChunksByRepo(db, repoPath);
       chunksRemoved = existingIds.length;
@@ -86,7 +99,12 @@ export async function runPipeline(options: IndexOptions): Promise<IndexStats> {
     filesToProcess = filterFiles(getTrackedFiles(repoPath));
   }
 
+  log(`${filesToProcess.length} files to process`);
+
   let chunksCreated = 0;
+  let filesProcessedSoFar = 0;
+  let errors = 0;
+  const logInterval = Math.max(1, Math.floor(filesToProcess.length / 20)); // ~20 progress updates
 
   for (const file of filesToProcess) {
     try {
@@ -142,8 +160,15 @@ export async function runPipeline(options: IndexOptions): Promise<IndexStats> {
         chunksCreated++;
       }
     } catch (err) {
-      console.error(`[scrooge] Error processing file ${file}:`, err);
+      errors++;
+      log(`Error processing ${file}: ${err instanceof Error ? err.message : err}`);
       continue;
+    }
+
+    filesProcessedSoFar++;
+    if (filesProcessedSoFar % logInterval === 0 || filesProcessedSoFar === filesToProcess.length) {
+      const pct = Math.round((filesProcessedSoFar / filesToProcess.length) * 100);
+      log(`${pct}% (${filesProcessedSoFar}/${filesToProcess.length} files, ${chunksCreated} chunks) ${elapsed(start)}`);
     }
   }
 
@@ -163,12 +188,16 @@ export async function runPipeline(options: IndexOptions): Promise<IndexStats> {
     total_files: totalFiles,
   });
 
-  return {
+  const stats = {
     filesProcessed: filesToProcess.length,
     chunksCreated,
     chunksRemoved,
     timeMs: Date.now() - start,
   };
+
+  log(`Done in ${elapsed(start)} -- ${stats.filesProcessed} files, ${stats.chunksCreated} chunks created, ${stats.chunksRemoved} removed${errors > 0 ? `, ${errors} errors` : ""}`);
+
+  return stats;
 }
 
 function detectModule(filePath: string): string | undefined {

@@ -76,6 +76,18 @@ describe("directory tree", () => {
     expect(text).toContain("core");
     expect(text).toContain("build.gradle.kts");
   });
+
+  it("should collapse deep directories when maxDepth is set", () => {
+    const tree = generateTree(db, REPO_PATH);
+    // maxDepth=1 should collapse everything below the first dir level
+    const text = renderTree(tree, { maxDepth: 1 });
+    // Top-level dirs should exist
+    expect(text).toContain("app");
+    expect(text).toContain("core");
+    // Files nested inside should be collapsed into counts
+    expect(text).not.toContain("LoginViewModel.kt");
+    expect(text).toContain("files)");
+  });
 });
 
 describe("module summaries", () => {

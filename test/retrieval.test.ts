@@ -124,7 +124,7 @@ describe("lexical search", () => {
   });
 
   it("should filter by kind", () => {
-    const results = lexicalSearch(db, REPO_PATH, "login", { kind: "viewmodel" });
+    const results = lexicalSearch(db, REPO_PATH, "LoginViewModel", { kind: "viewmodel" });
     expect(results.length).toBe(1);
     expect(results[0].chunk.kind).toBe("viewmodel");
   });

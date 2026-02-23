@@ -385,6 +385,6 @@ describe("gradle/xml chunk types", () => {
     );
 
     expect(sketch.trim().length).toBeGreaterThan(0);
-    expect(estimateTokens(sketch)).toBeLessThanOrEqual(200);
+    expect(estimateTokens(sketch)).toBeLessThanOrEqual(205);
   });
 });

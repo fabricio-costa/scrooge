@@ -12,6 +12,7 @@ import {
   insertChunk,
   insertVecEmbedding,
   deleteChunksByPath,
+  deleteChunksByRepo,
   deleteVecByIds,
   getChunkIdsByPath,
   upsertIndexMeta,

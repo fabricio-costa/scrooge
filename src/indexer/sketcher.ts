@@ -1,7 +1,6 @@
 import { estimateTokens, truncateToTokenBudget } from "../utils/tokens.js";
+import { getConfig } from "../utils/config.js";
 import type { Chunk } from "./chunkers/types.js";
-
-const MAX_SKETCH_TOKENS = 200;
 
 /**
  * Generate a compressed sketch from a raw chunk.

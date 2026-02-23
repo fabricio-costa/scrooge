@@ -94,9 +94,9 @@ export function buildStatisticsReport(
 
   // Token Savings
   lines.push("### Token Savings");
-  lines.push(`Tokens delivered: ${totalSent.toLocaleString()}`);
-  lines.push(`Raw equivalent:  ${totalRaw.toLocaleString()}`);
-  lines.push(`Saved:           ${saved.toLocaleString()} (${savingsPct}%)`);
+  lines.push(`Tokens delivered: ${totalSent.toLocaleString("en-US")}`);
+  lines.push(`Raw equivalent:  ${totalRaw.toLocaleString("en-US")}`);
+  lines.push(`Saved:           ${saved.toLocaleString("en-US")} (${savingsPct}%)`);
   lines.push("");
 
   // Usage breakdown
@@ -195,7 +195,7 @@ function getSearchInsights(
 
   const totalSources = lexical + vector + both;
   const avgResults = (totalResults / searchCalls.length).toFixed(1);
-  const avgTokens = Math.round(totalTokens / searchCalls.length).toLocaleString();
+  const avgTokens = Math.round(totalTokens / searchCalls.length).toLocaleString("en-US");
 
   return {
     avgResults,

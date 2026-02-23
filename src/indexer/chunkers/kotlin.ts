@@ -73,7 +73,7 @@ function processClass(
   lines: string[],
   packageName: string,
   imports: string[],
-  parentClass?: string,
+  _parentClass?: string,
 ): Chunk[] | null {
   const name = findChildByType(node, "type_identifier")?.text
     ?? findChildByType(node, "simple_identifier")?.text;

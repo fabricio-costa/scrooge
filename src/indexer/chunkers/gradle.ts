@@ -92,7 +92,7 @@ function makeBlockChunk(
     startLine,
     endLine,
     textRaw: text,
-    textSketch: text.length > 800 ? text.slice(0, 800) + "\n..." : text,
+    textSketch: truncateToTokenBudget(text, 200),
     tags: ["gradle"],
     annotations: [],
     defines: [],

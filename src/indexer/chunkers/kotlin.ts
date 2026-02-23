@@ -286,8 +286,6 @@ function classifyClassKind(
         || text.includes("@GET") || text.includes("@POST") || text.includes("@PUT") || text.includes("@DELETE")) {
       return "api_interface";
     }
-    if (annotationTexts.some((a) => a.includes("Dao"))) return "dao";
-    return "class"; // plain interface, classified as class
   }
 
   return "class";

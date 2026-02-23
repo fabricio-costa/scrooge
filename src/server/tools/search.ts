@@ -1,9 +1,10 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { openDb } from "../../storage/db.js";
+import { openDb, recordToolCall } from "../../storage/db.js";
 import { getConfig } from "../../utils/config.js";
 import { hybridSearch } from "../../retrieval/hybrid.js";
 import { packageResults, type ViewMode } from "../../retrieval/packager.js";
+import { estimateTokens } from "../../utils/tokens.js";
 
 export function registerSearchTool(server: McpServer): void {
   server.tool(
@@ -23,6 +24,7 @@ export function registerSearchTool(server: McpServer): void {
       token_budget: z.number().optional().describe("Maximum tokens in response (default 3000)"),
     },
     async ({ query, repo_path, filters, view, max_results, token_budget }) => {
+      const startTime = Date.now();
       const repoPath = repo_path ?? process.cwd();
       const config = getConfig();
       const db = openDb(config.dbPath);
@@ -41,11 +43,27 @@ export function registerSearchTool(server: McpServer): void {
           max_results ?? config.defaultMaxResults,
         );
 
+        const viewMode = (view as ViewMode) ?? "sketch";
         const packaged = packageResults(
           results,
-          (view as ViewMode) ?? "sketch",
+          viewMode,
           token_budget ?? config.defaultTokenBudget,
         );
+
+        const tokensRaw = results.reduce((sum, r) => sum + estimateTokens(r.chunk.text_raw), 0);
+        const sources = { lexical: 0, vector: 0, both: 0 };
+        for (const r of results) {
+          sources[r.source]++;
+        }
+
+        recordToolCall(db, {
+          tool: "search",
+          repo_path: repoPath,
+          duration_ms: Date.now() - startTime,
+          tokens_sent: packaged.totalTokens,
+          tokens_raw: tokensRaw,
+          metadata: { query, resultCount: packaged.results.length, truncated: packaged.truncated, view: viewMode, sources },
+        });
 
         return {
           content: [

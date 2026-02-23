@@ -80,7 +80,7 @@ function makeChunk(filePath: string, text: string, startLine: number, endLine: n
     startLine,
     endLine,
     textRaw: text,
-    textSketch: text.length > 800 ? text.slice(0, 800) + "\n..." : text,
+    textSketch: truncateToTokenBudget(text, 200),
     tags: [],
     annotations: [],
     defines: [],

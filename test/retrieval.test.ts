@@ -96,20 +96,21 @@ afterEach(() => {
 describe("lexical search", () => {
   it("should find chunks by symbol name", () => {
     const results = lexicalSearch(db, REPO_PATH, "LoginViewModel");
-    expect(results.length).toBeGreaterThan(0);
-    // Verify LoginViewModel appears in results (FTS5 ranking may vary)
-    const hasLoginVm = results.some((r) => r.chunk.symbol_name === "LoginViewModel");
-    expect(hasLoginVm).toBe(true);
+    expect(results.length).toBeGreaterThanOrEqual(1);
+    expect(results[0].chunk.symbol_name).toBe("LoginViewModel");
+    expect(results[0].source).toBe("lexical");
+    expect(results[0].rank).toBe(1);
+    expect(results[0].score).toBeGreaterThan(0);
   });
 
   it("should find chunks by content keywords", () => {
     const results = lexicalSearch(db, REPO_PATH, "authenticate email password");
-    expect(results.length).toBeGreaterThan(0);
+    expect(results.length).toBeGreaterThanOrEqual(1);
   });
 
   it("should filter by module", () => {
     const results = lexicalSearch(db, REPO_PATH, "login", { module: ":app" });
-    expect(results.length).toBeGreaterThan(0);
+    expect(results.length).toBeGreaterThanOrEqual(1);
     for (const r of results) {
       expect(r.chunk.module).toBe(":app");
     }
@@ -122,15 +123,34 @@ describe("lexical search", () => {
     }
   });
 
+  it("should filter by kind", () => {
+    const results = lexicalSearch(db, REPO_PATH, "login", { kind: "viewmodel" });
+    expect(results.length).toBe(1);
+    expect(results[0].chunk.kind).toBe("viewmodel");
+  });
+
+  it("should filter by tags", () => {
+    const results = lexicalSearch(db, REPO_PATH, "login", { tags: ["hilt"] });
+    expect(results.length).toBeGreaterThanOrEqual(1);
+    for (const r of results) {
+      const tags = JSON.parse(r.chunk.tags ?? "[]") as string[];
+      expect(tags).toContain("hilt");
+    }
+  });
+
   it("should return empty for non-matching query", () => {
     const results = lexicalSearch(db, REPO_PATH, "zzzznonexistent");
     expect(results.length).toBe(0);
   });
 
   it("should split CamelCase in query", () => {
-    // "LoginViewModel" should match even if searched as "Login View Model"
     const results = lexicalSearch(db, REPO_PATH, "Login View Model");
     expect(results.length).toBeGreaterThan(0);
+  });
+
+  it("should respect limit parameter", () => {
+    const results = lexicalSearch(db, REPO_PATH, "login", {}, 1);
+    expect(results.length).toBe(1);
   });
 });
 

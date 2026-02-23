@@ -81,18 +81,21 @@ describe("directory tree", () => {
 describe("module summaries", () => {
   it("should return summaries per module", () => {
     const summaries = getModuleSummaries(db, REPO_PATH);
-    expect(summaries.length).toBeGreaterThan(0);
+    // :app and :core modules
+    expect(summaries.length).toBe(2);
 
     const appModule = summaries.find((s) => s.module === ":app");
     expect(appModule).toBeDefined();
-    expect(appModule!.fileCount).toBeGreaterThanOrEqual(2);
-    expect(appModule!.languages.kotlin).toBeGreaterThan(0);
+    expect(appModule!.fileCount).toBe(3);
+    expect(appModule!.languages.kotlin).toBe(2);
+    expect(appModule!.languages.xml).toBe(1);
   });
 
   it("should include top symbols", () => {
     const summaries = getModuleSummaries(db, REPO_PATH);
     const appModule = summaries.find((s) => s.module === ":app");
     expect(appModule!.topSymbols).toContain("LoginViewModel");
+    expect(appModule!.topSymbols).toContain("AuthRepository");
   });
 });
 

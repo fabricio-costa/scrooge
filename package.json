@@ -1,0 +1,38 @@
+{
+  "name": "scrooge",
+  "version": "0.1.0",
+  "description": "Local MCP server for code-aware Repo Map + Hybrid RAG, reducing token spend in agent planning mode",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "scrooge": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/index.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint src/ test/",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.0",
+    "@xenova/transformers": "^2.17.0",
+    "better-sqlite3": "^11.7.0",
+    "sqlite-vec": "^0.1.6",
+    "tree-sitter": "^0.21.1",
+    "tree-sitter-kotlin": "^0.3.8",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/node": "^22.10.0",
+    "eslint": "^9.16.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0",
+    "vitest": "^2.1.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

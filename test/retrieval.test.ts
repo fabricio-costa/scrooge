@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { openDb, insertChunk, insertVecEmbedding } from "../src/storage/db.js";
+import { openDb, insertChunk } from "../src/storage/db.js";
 import { lexicalSearch } from "../src/retrieval/lexical.js";
 import { packageResults } from "../src/retrieval/packager.js";
 import type Database from "better-sqlite3";

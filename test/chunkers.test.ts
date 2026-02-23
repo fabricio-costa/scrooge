@@ -142,7 +142,8 @@ describe("xml android chunker", () => {
     const content = fixture("AndroidManifest.xml");
     const chunks = xmlAndroidChunker.chunk("AndroidManifest.xml", content);
 
-    expect(chunks.length).toBeGreaterThanOrEqual(3); // activity, service, receiver
+    // 2 activities + 1 service + 1 receiver = 4 components
+    expect(chunks.length).toBe(4);
 
     const activityChunk = chunks.find((c) =>
       c.symbolFqname?.includes("MainActivity"),
@@ -157,8 +158,51 @@ describe("xml android chunker", () => {
     const chunks = xmlAndroidChunker.chunk("AndroidManifest.xml", content);
 
     const names = chunks.map((c) => c.symbolFqname).filter(Boolean);
-    expect(names.some((n) => n!.includes("MainActivity"))).toBe(true);
-    expect(names.some((n) => n!.includes("SyncService"))).toBe(true);
+    expect(names).toContain(".ui.main.MainActivity");
+    expect(names).toContain(".ui.login.LoginActivity");
+    expect(names).toContain(".service.SyncService");
+    expect(names).toContain(".receiver.BootReceiver");
+  });
+
+  it("should chunk navigation XML into destinations", () => {
+    const content = fixture("nav_graph.xml");
+    const chunks = xmlAndroidChunker.chunk("app/src/main/res/navigation/nav_graph.xml", content);
+
+    expect(chunks.length).toBeGreaterThanOrEqual(3);
+    for (const chunk of chunks) {
+      expect(chunk.kind).toBe("nav_destination");
+      expect(chunk.tags).toContain("navigation");
+    }
+
+    const homeChunk = chunks.find((c) => c.symbolName === "homeFragment");
+    expect(homeChunk).toBeDefined();
+    // Home has actions pointing to detail, settings, profile
+    expect(homeChunk!.uses.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("should chunk layout XML and extract IDs", () => {
+    const content = fixture("activity_main.xml");
+    const chunks = xmlAndroidChunker.chunk("app/src/main/res/layout/activity_main.xml", content);
+
+    expect(chunks.length).toBe(1);
+    const chunk = chunks[0];
+    expect(chunk.kind).toBe("layout");
+    expect(chunk.tags).toContain("layout");
+    expect(chunk.symbolName).toBe("activity_main");
+    // Should extract IDs
+    expect(chunk.defines.length).toBeGreaterThanOrEqual(5);
+    expect(chunk.defines).toContain("@+id/toolbar");
+    expect(chunk.defines).toContain("@+id/fabAdd");
+    expect(chunk.textSketch).toContain("ConstraintLayout");
+  });
+
+  it("should chunk values XML as single chunk", () => {
+    const content = fixture("strings.xml");
+    const chunks = xmlAndroidChunker.chunk("app/src/main/res/values/strings.xml", content);
+
+    expect(chunks.length).toBe(1);
+    expect(chunks[0].kind).toBe("values");
+    expect(chunks[0].symbolName).toBe("strings");
   });
 });
 

@@ -16,6 +16,7 @@ export function registerLookupTool(server: McpServer): void {
       const repoPath = repo_path ?? process.cwd();
       const config = getConfig();
       const db = openDb(config.dbPath);
+      const escapedSymbol = symbol.replace(/"/g, '""');
 
       try {
         // Find definition
@@ -40,7 +41,7 @@ export function registerLookupTool(server: McpServer): void {
               WHERE repo_path = ? AND uses LIKE ? AND symbol_name != ?
               ORDER BY path, start_line
             `)
-            .all(repoPath, `%"${symbol}"%`, symbol) as ChunkRow[];
+            .all(repoPath, `%"${escapedSymbol}"%`, symbol) as ChunkRow[];
 
           // Also find via FTS
           const ftsUsages = db
@@ -50,7 +51,7 @@ export function registerLookupTool(server: McpServer): void {
               WHERE chunks_fts MATCH ? AND c.repo_path = ? AND c.symbol_name != ?
               LIMIT 20
             `)
-            .all(`"${symbol}"`, repoPath, symbol) as ChunkRow[];
+            .all(`"${escapedSymbol}"`, repoPath, symbol) as ChunkRow[];
 
           // Merge and deduplicate
           const seenIds = new Set(usages.map((u) => u.id));

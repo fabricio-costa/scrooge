@@ -74,6 +74,13 @@ export async function runPipeline(options: IndexOptions): Promise<IndexStats> {
       filesToProcess = filterFiles(getTrackedFiles(repoPath));
     }
   } else {
+    // Full re-index: clear existing chunks to avoid orphans from deleted files
+    const existingIds = (db.prepare("SELECT id FROM chunks WHERE repo_path = ?").all(repoPath) as Array<{ id: string }>).map((r) => r.id);
+    if (existingIds.length > 0) {
+      deleteVecByIds(db, existingIds);
+      deleteChunksByRepo(db, repoPath);
+      chunksRemoved = existingIds.length;
+    }
     filesToProcess = filterFiles(getTrackedFiles(repoPath));
   }
 

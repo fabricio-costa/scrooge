@@ -179,7 +179,7 @@ function makeFileChunk(filePath: string, content: string, kind: ChunkKind): Chun
     startLine: 1,
     endLine: lines.length,
     textRaw: content,
-    textSketch: content.length > 800 ? content.slice(0, 800) + "\n..." : content,
+    textSketch: truncateToTokenBudget(content, 200),
     tags: [],
     annotations: [],
     defines: [],

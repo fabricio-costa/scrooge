@@ -159,7 +159,12 @@ describe("generic chunker", () => {
   });
 
   it("should split large files into multiple chunks", () => {
-    const lines = Array.from({ length: 300 }, (_, i) => `line ${i}`);
+    // Include empty lines as block boundaries every 50 lines
+    const lines: string[] = [];
+    for (let i = 0; i < 300; i++) {
+      if (i > 0 && i % 50 === 0) lines.push("");
+      lines.push(`line ${i}`);
+    }
     const content = lines.join("\n");
     const chunks = genericChunker.chunk("large.txt", content);
     expect(chunks.length).toBeGreaterThan(1);

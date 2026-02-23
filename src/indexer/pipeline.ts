@@ -57,6 +57,7 @@ export async function runPipeline(options: IndexOptions): Promise<IndexStats> {
     if (meta?.last_commit_sha) {
       const changedFiles = getChangedFiles(repoPath, meta.last_commit_sha, commitSha);
       const deletedFiles = getDeletedFiles(repoPath, meta.last_commit_sha, commitSha);
+      const deletedSet = new Set(deletedFiles);
 
       // Remove chunks for changed/deleted files
       for (const file of [...changedFiles, ...deletedFiles]) {
@@ -69,7 +70,7 @@ export async function runPipeline(options: IndexOptions): Promise<IndexStats> {
       }
 
       // Only process changed files (not deleted)
-      filesToProcess = filterFiles(changedFiles.filter((f) => !deletedFiles.includes(f)));
+      filesToProcess = filterFiles(changedFiles.filter((f) => !deletedSet.has(f)));
     } else {
       // No previous index: full index
       filesToProcess = filterFiles(getTrackedFiles(repoPath));

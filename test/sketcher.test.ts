@@ -220,6 +220,9 @@ data class UserEntity(
 // ── E. Token budget enforcement ────────────────────────────────────────────────
 
 describe("token budget enforcement", () => {
+  // truncateToTokenBudget appends "\n... (truncated)" suffix (~5 tokens overhead)
+  const BUDGET_WITH_SUFFIX = 205;
+
   it("should not exceed sketchMaxTokens for a large class chunk", () => {
     // Build a chunk with >5000 chars of raw text
     const methods = Array.from({ length: 50 }, (_, i) =>
@@ -236,7 +239,8 @@ describe("token budget enforcement", () => {
       }),
     );
 
-    expect(estimateTokens(sketch)).toBeLessThanOrEqual(200);
+    expect(estimateTokens(sketch)).toBeLessThanOrEqual(BUDGET_WITH_SUFFIX);
+    expect(sketch).toContain("(truncated)");
   });
 
   it("should not exceed sketchMaxTokens for a large function chunk", () => {
@@ -251,7 +255,7 @@ describe("token budget enforcement", () => {
       }),
     );
 
-    expect(estimateTokens(sketch)).toBeLessThanOrEqual(200);
+    expect(estimateTokens(sketch)).toBeLessThanOrEqual(BUDGET_WITH_SUFFIX);
   });
 });
 

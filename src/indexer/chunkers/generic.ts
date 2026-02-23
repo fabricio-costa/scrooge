@@ -1,6 +1,6 @@
-import { createHash } from "node:crypto";
 import { basename } from "node:path";
 import type { Chunk, ChunkerPlugin } from "./types.js";
+import { hashContent, chunkId } from "./utils.js";
 
 const MAX_CHUNK_LINES = 100;
 

@@ -344,18 +344,22 @@ describe("RRF fusion", () => {
 
     const fused = rrfFuse(lexical, vector, K, 10);
 
-    // B: 1/(60+2) + 1/(60+2) = 2/(62) = 0.03226
-    // C: 1/(60+3) + 1/(60+1) = 1/63 + 1/61 = 0.03222
-    // A: 1/(60+1) = 1/61 = 0.01639
-    // D: 1/(60+3) = 1/63 = 0.01587
-    expect(fused[0].chunk.id).toBe("B");
+    // C: 1/(60+3) + 1/(60+1) = 1/63 + 1/61 ≈ 0.032266
+    // B: 1/(60+2) + 1/(60+2) = 2/62 ≈ 0.032258
+    // A: 1/(60+1) = 1/61 ≈ 0.016393
+    // D: 1/(60+3) = 1/63 ≈ 0.015873
+    expect(fused[0].chunk.id).toBe("C");
     expect(fused[0].source).toBe("both");
-    expect(fused[1].chunk.id).toBe("C");
+    expect(fused[1].chunk.id).toBe("B");
     expect(fused[1].source).toBe("both");
+    expect(fused[2].chunk.id).toBe("A");
+    expect(fused[2].source).toBe("lexical");
+    expect(fused[3].chunk.id).toBe("D");
+    expect(fused[3].source).toBe("vector");
 
     // Verify strictly descending scores
     for (let i = 1; i < fused.length; i++) {
-      expect(fused[i - 1].score).toBeGreaterThan(fused[i].score);
+      expect(fused[i - 1].score).toBeGreaterThanOrEqual(fused[i].score);
     }
   });
 

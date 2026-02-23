@@ -269,3 +269,26 @@ export function getChunkIdsByPath(db: Database.Database, repoPath: string, fileP
     .all(repoPath, filePath) as Array<{ id: string }>;
   return rows.map((r) => r.id);
 }
+
+export interface ToolCallRecord {
+  tool: string;
+  repo_path: string;
+  duration_ms: number;
+  tokens_sent: number;
+  tokens_raw: number;
+  metadata?: Record<string, unknown>;
+}
+
+export function recordToolCall(db: Database.Database, data: ToolCallRecord): void {
+  db.prepare(`
+    INSERT INTO tool_calls (tool, repo_path, duration_ms, tokens_sent, tokens_raw, metadata)
+    VALUES (@tool, @repo_path, @duration_ms, @tokens_sent, @tokens_raw, @metadata)
+  `).run({
+    tool: data.tool,
+    repo_path: data.repo_path,
+    duration_ms: data.duration_ms,
+    tokens_sent: data.tokens_sent,
+    tokens_raw: data.tokens_raw,
+    metadata: data.metadata ? JSON.stringify(data.metadata) : null,
+  });
+}

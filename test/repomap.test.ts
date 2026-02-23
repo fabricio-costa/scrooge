@@ -56,12 +56,12 @@ describe("directory tree", () => {
     const tree = generateTree(db, REPO_PATH);
     expect(tree.type).toBe("dir");
     expect(tree.children).toBeDefined();
-    expect(tree.children!.length).toBeGreaterThan(0);
+    // Top-level: app/, core/, build.gradle.kts = 3 entries
+    expect(tree.children!.length).toBe(3);
   });
 
   it("should filter by module", () => {
     const tree = generateTree(db, REPO_PATH, ":app");
-    // Should only contain app/ paths
     const rendered = renderTree(tree);
     expect(rendered).toContain("app");
     expect(rendered).not.toContain("core");
@@ -71,7 +71,10 @@ describe("directory tree", () => {
     const tree = generateTree(db, REPO_PATH);
     const text = renderTree(tree);
     expect(text).toContain("LoginViewModel.kt");
+    expect(text).toContain("AuthRepository.kt");
     expect(text).toContain("app");
+    expect(text).toContain("core");
+    expect(text).toContain("build.gradle.kts");
   });
 });
 

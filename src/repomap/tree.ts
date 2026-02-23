@@ -8,6 +8,10 @@ export interface TreeNode {
   chunkCount?: number;
 }
 
+export interface RenderOptions {
+  maxDepth?: number; // Collapse directories deeper than this into "(X files)" summaries
+}
+
 /**
  * Generate a pruned directory tree from indexed files.
  */
@@ -76,15 +80,41 @@ function sortTree(node: TreeNode): void {
   }
 }
 
+function countDescendantFiles(node: TreeNode): number {
+  if (node.type === "file") return 1;
+  if (!node.children) return 0;
+  return node.children.reduce((sum, child) => sum + countDescendantFiles(child), 0);
+}
+
 /**
  * Render tree as a text string for display.
+ * When maxDepth is set, directories deeper than that level are collapsed
+ * into a single line showing the total file count underneath.
  */
-export function renderTree(node: TreeNode, prefix: string = "", isLast: boolean = true): string {
+export function renderTree(node: TreeNode, options?: RenderOptions): string {
+  const maxDepth = options?.maxDepth ?? Infinity;
+  return renderNode(node, "", true, 0, maxDepth);
+}
+
+function renderNode(
+  node: TreeNode,
+  prefix: string,
+  isLast: boolean,
+  depth: number,
+  maxDepth: number,
+): string {
   const lines: string[] = [];
   const connector = isLast ? "└── " : "├── ";
   const childPrefix = isLast ? "    " : "│   ";
 
   if (node.name !== ".") {
+    // Collapse deep directories into a summary line
+    if (node.type === "dir" && depth > maxDepth && node.children && node.children.length > 0) {
+      const fileCount = countDescendantFiles(node);
+      lines.push(prefix + connector + node.name + `/ (${fileCount} files)`);
+      return lines.join("\n");
+    }
+
     const suffix = node.chunkCount ? ` (${node.chunkCount} chunks)` : "";
     lines.push(prefix + connector + node.name + suffix);
   }
@@ -94,7 +124,7 @@ export function renderTree(node: TreeNode, prefix: string = "", isLast: boolean 
       const child = node.children[i];
       const last = i === node.children.length - 1;
       const newPrefix = node.name === "." ? "" : prefix + childPrefix;
-      lines.push(renderTree(child, newPrefix, last));
+      lines.push(renderNode(child, newPrefix, last, depth + 1, maxDepth));
     }
   }
 

@@ -201,9 +201,9 @@ export async function runPipeline(options: IndexOptions): Promise<IndexStats> {
 }
 
 function detectModule(filePath: string): string | undefined {
-  // Pattern: <module>/src/... → :<module>
-  const match = filePath.match(/^([^/]+)\/src\//);
-  if (match) return `:${match[1]}`;
+  // Pattern: <module>/src/... → :<module> (supports nested like core/common/src/ → :core:common)
+  const match = filePath.match(/^(.+?)\/src\//);
+  if (match) return `:${match[1].replace(/\//g, ":")}`;
   return undefined;
 }
 

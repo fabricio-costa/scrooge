@@ -1,21 +1,73 @@
 import Database from "better-sqlite3";
 import * as sqliteVec from "sqlite-vec";
-import { readFileSync } from "node:fs";
-import { join, dirname } from "node:path";
-import { fileURLToPath } from "node:url";
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
+const SCHEMA_VERSION = 1;
 
-let _db: Database.Database | null = null;
+const SCHEMA_SQL = `
+CREATE TABLE IF NOT EXISTS chunks (
+  id TEXT PRIMARY KEY,
+  repo_path TEXT NOT NULL,
+  commit_sha TEXT NOT NULL,
+  path TEXT NOT NULL,
+  module TEXT,
+  source_set TEXT,
+  language TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  symbol_name TEXT,
+  symbol_fqname TEXT,
+  signature TEXT,
+  start_line INTEGER NOT NULL,
+  end_line INTEGER NOT NULL,
+  text_raw TEXT NOT NULL,
+  text_sketch TEXT NOT NULL,
+  tags TEXT,
+  annotations TEXT,
+  defines TEXT,
+  uses TEXT,
+  content_hash TEXT NOT NULL,
+  created_at TEXT DEFAULT (datetime('now'))
+);
 
-export function getDb(dbPath?: string): Database.Database {
-  if (_db) return _db;
-  _db = openDb(dbPath);
-  return _db;
-}
+CREATE INDEX IF NOT EXISTS idx_chunks_repo_path ON chunks(repo_path, path);
+CREATE INDEX IF NOT EXISTS idx_chunks_language ON chunks(repo_path, language);
+CREATE INDEX IF NOT EXISTS idx_chunks_kind ON chunks(repo_path, kind);
+CREATE INDEX IF NOT EXISTS idx_chunks_symbol ON chunks(repo_path, symbol_name);
+CREATE INDEX IF NOT EXISTS idx_chunks_module ON chunks(repo_path, module);
+CREATE INDEX IF NOT EXISTS idx_chunks_content_hash ON chunks(content_hash);
+
+CREATE VIRTUAL TABLE IF NOT EXISTS chunks_fts USING fts5(
+  symbol_name, symbol_fqname, text_raw, path, tags,
+  content='chunks', content_rowid='rowid'
+);
+
+CREATE TRIGGER IF NOT EXISTS chunks_ai AFTER INSERT ON chunks BEGIN
+  INSERT INTO chunks_fts(rowid, symbol_name, symbol_fqname, text_raw, path, tags)
+  VALUES (new.rowid, new.symbol_name, new.symbol_fqname, new.text_raw, new.path, new.tags);
+END;
+
+CREATE TRIGGER IF NOT EXISTS chunks_ad AFTER DELETE ON chunks BEGIN
+  INSERT INTO chunks_fts(chunks_fts, rowid, symbol_name, symbol_fqname, text_raw, path, tags)
+  VALUES ('delete', old.rowid, old.symbol_name, old.symbol_fqname, old.text_raw, old.path, old.tags);
+END;
+
+CREATE TRIGGER IF NOT EXISTS chunks_au AFTER UPDATE ON chunks BEGIN
+  INSERT INTO chunks_fts(chunks_fts, rowid, symbol_name, symbol_fqname, text_raw, path, tags)
+  VALUES ('delete', old.rowid, old.symbol_name, old.symbol_fqname, old.text_raw, old.path, old.tags);
+  INSERT INTO chunks_fts(rowid, symbol_name, symbol_fqname, text_raw, path, tags)
+  VALUES (new.rowid, new.symbol_name, new.symbol_fqname, new.text_raw, new.path, new.tags);
+END;
+
+CREATE TABLE IF NOT EXISTS index_meta (
+  repo_path TEXT PRIMARY KEY,
+  last_commit_sha TEXT,
+  last_indexed_at TEXT,
+  total_chunks INTEGER,
+  total_files INTEGER
+);
+`;
 
 export function openDb(dbPath?: string): Database.Database {
-  const resolvedPath = dbPath ?? join(process.env.HOME ?? "~", ".scrooge", "scrooge.db");
+  const resolvedPath = dbPath ?? (process.env.HOME ?? "~") + "/.scrooge/scrooge.db";
   const db = new Database(resolvedPath);
 
   db.pragma("journal_mode = WAL");
@@ -29,10 +81,10 @@ export function openDb(dbPath?: string): Database.Database {
 }
 
 export function runMigrations(db: Database.Database): void {
-  const schema = readFileSync(join(__dirname, "schema.sql"), "utf-8");
+  const currentVersion = (db.pragma("user_version") as Array<{ user_version: number }>)[0].user_version;
+  if (currentVersion >= SCHEMA_VERSION) return;
 
-  // Split on semicolons but preserve content inside trigger blocks
-  const statements = splitStatements(schema);
+  const statements = splitStatements(SCHEMA_SQL);
 
   db.transaction(() => {
     for (const stmt of statements) {
@@ -45,6 +97,8 @@ export function runMigrations(db: Database.Database): void {
 
   // Create the vec table separately (virtual tables can't be in transactions easily)
   ensureVecTable(db);
+
+  db.pragma(`user_version = ${SCHEMA_VERSION}`);
 }
 
 function ensureVecTable(db: Database.Database): void {

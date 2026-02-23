@@ -45,6 +45,15 @@ export function generateSketch(chunk: Chunk): string {
         parts.push(extractFunctionSignature(textRaw));
       }
       break;
+    case "interface":
+      parts.push(extractTsInterfaceMembers(textRaw));
+      break;
+    case "type_alias":
+      // Type aliases are usually short — signature is enough
+      break;
+    case "enum":
+      parts.push(extractEnumMembers(textRaw));
+      break;
     case "api_interface":
     case "dao":
       parts.push(extractInterfaceMethods(textRaw));
@@ -108,12 +117,22 @@ function extractClassSkeleton(text: string): string {
 
   for (const line of lines) {
     const trimmed = line.trim();
-    // Keep property declarations
+    // Kotlin property declarations
     if (trimmed.startsWith("val ") || trimmed.startsWith("var ") || trimmed.startsWith("private val ") || trimmed.startsWith("private var ")) {
       skeleton.push("  " + trimmed);
     }
-    // Keep function signatures (just the signature, not the body)
+    // Kotlin function signatures
     if (/^\s*(override\s+)?(suspend\s+)?(fun\s+)/.test(line)) {
+      const sig = trimmed.replace(/\{[\s\S]*$/, "").trim();
+      skeleton.push("  " + sig);
+    }
+    // TypeScript property declarations
+    if (/^\s*(public|private|protected|readonly|static)\s+\w+\s*[?:]/.test(line)) {
+      skeleton.push("  " + trimmed);
+    }
+    // TypeScript method signatures (exclude control flow keywords)
+    if (/^\s*(public|private|protected|static|async)\s+\w+\s*\(/.test(line)
+        && !trimmed.startsWith("if") && !trimmed.startsWith("for") && !trimmed.startsWith("while")) {
       const sig = trimmed.replace(/\{[\s\S]*$/, "").trim();
       skeleton.push("  " + sig);
     }
@@ -142,6 +161,35 @@ function extractInterfaceMethods(text: string): string {
     }
   }
   return methods.join("\n");
+}
+
+function extractTsInterfaceMembers(text: string): string {
+  const lines = text.split("\n");
+  const members: string[] = [];
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (trimmed === "{" || trimmed === "}" || trimmed === "") continue;
+    if (trimmed.startsWith("interface ") || trimmed.startsWith("export ")) continue;
+    // Property/method signatures: "name: Type;", "readonly name: Type;", "[key: Type]: Type;", "method(args): Type;"
+    if (/^\w/.test(trimmed) || trimmed.startsWith("readonly ") || /^\[/.test(trimmed)) {
+      members.push("  " + trimmed);
+    }
+  }
+  return members.join("\n");
+}
+
+function extractEnumMembers(text: string): string {
+  const lines = text.split("\n");
+  const members: string[] = [];
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (trimmed === "{" || trimmed === "}" || trimmed === "") continue;
+    if (trimmed.startsWith("enum ") || trimmed.startsWith("export ")) continue;
+    if (/^\w+\s*(=|,|$)/.test(trimmed)) {
+      members.push("  " + trimmed);
+    }
+  }
+  return members.join("\n");
 }
 
 function extractEntityFields(text: string): string {

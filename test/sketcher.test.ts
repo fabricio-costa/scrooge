@@ -217,6 +217,67 @@ data class UserEntity(
   });
 });
 
+// ── TS. TypeScript-specific sketches ─────────────────────────────────────────
+
+describe("typescript interface/enum/type_alias sketches", () => {
+  it("should extract member signatures from an interface", () => {
+    const sketch = generateSketch(
+      makeChunk({
+        kind: "interface",
+        language: "typescript",
+        path: "types.ts",
+        signature: "export interface User",
+        textRaw: `export interface User {
+  id: string;
+  email: string;
+  name: string;
+  role: UserRole;
+  createdAt: Date;
+}`,
+      }),
+    );
+
+    expect(sketch).toContain("id: string;");
+    expect(sketch).toContain("email: string;");
+    expect(sketch).toContain("role: UserRole;");
+  });
+
+  it("should extract enum members", () => {
+    const sketch = generateSketch(
+      makeChunk({
+        kind: "enum",
+        language: "typescript",
+        path: "types.ts",
+        signature: "export enum UserRole",
+        textRaw: `export enum UserRole {
+  Admin = "ADMIN",
+  Member = "MEMBER",
+  Guest = "GUEST",
+}`,
+      }),
+    );
+
+    expect(sketch).toContain("Admin");
+    expect(sketch).toContain("Member");
+    expect(sketch).toContain("Guest");
+  });
+
+  it("should show type alias definition in sketch", () => {
+    const sketch = generateSketch(
+      makeChunk({
+        kind: "type_alias",
+        language: "typescript",
+        path: "types.ts",
+        signature: `export type CreateUserDto = Omit<User, "id" | "createdAt">;`,
+        textRaw: `export type CreateUserDto = Omit<User, "id" | "createdAt">;`,
+      }),
+    );
+
+    expect(sketch).toContain("CreateUserDto");
+    expect(sketch).toContain("Omit<User");
+  });
+});
+
 // ── E. Token budget enforcement ────────────────────────────────────────────────
 
 describe("token budget enforcement", () => {

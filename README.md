@@ -1,22 +1,73 @@
 ```
-   ╭──────────────────────────────────────────────────╮
-   │                                                  │
-   │     $$$$$$$                                      │
-   │    $$$   $$$                                     │
-   │    $$     $$   Every token you waste             │
-   │    $$ o o $$   is money down the drain!          │
-   │    $$  >  $$                                     │
-   │    $$ \_/ $$          ___                        │
-   │    $$$$$$$$    ___   |   |  $$  $$               │
-   │    /||  ||\   |___|  |___|  $$  $$               │
-   │   / ||  || \                $$$$$$               │
-   │     ||  ||                                       │
-   │     ''  ''                                       │
-   │                                                  │
-   │   S C R O O G E                                  │
-   │   Token-Pinching Code Intelligence for Agents    │
-   │                                                  │
-   ╰──────────────────────────────────────────────────╯
+                                                                                                    
+                                            @@                                                      
+                                    @@@%###***%@@@@@                                                
+                                 @@@@@@%******%@@@@@@@                                              
+                               @@@@@@@@@#*****#@@@@@@@@                                             
+                             @@@@@@@@@@@@*****#@@@@@@@@                                             
+                             @@@@@@@@@@@@%*****@@@@@@@                                              
+                            @@@@@@@@@@@@@@******@@@@@@                                              
+                             @@@@@@@@@@@@@@*****@@@@@@                                              
+                               @@@@@@@@@@@@@%**+*%%@%@                                              
+                                @@@@@@@@%@@%++++*@@@@@                                              
+                                 @@@@%@@@@@@*+*#%##**#%###%@                                        
+                                   @@@@@@@@@##%@@@@@@@@@@@@@@%@                                     
+                                   @@@@@%#%@@@@@@@@@@@@@@@@@@@@%@                                   
+                                   @: =%@@@@@@@@@@@@@@%#%@@@@@@@%                                   
+                            @@@@@@%::. -%*-.     .==      %@@@@@@                                   
+                            %%%%%@@:-=.         =. .-=*:  %@@@@@@                                   
+                             @@@@@%::.-          .*:  :: .:*@@@@                                    
+                                 @++..-         --    ::    %@@                                     
+                                 @:: .-   +    --  .. -:    +@                                      
+                                 -:. .=       :=  ..  =     .@                                      
+                             @@@+ :. :%  =.   +.%@%. :=      .*@@ @@                                
+                           @@*: ..:. =@= +  :*.+@@@: =     ...  .*@                                 
+                          *+.    ::: .@@%==+*. *@@%..:    . .      +@                               
+                          @-  .%****-:=======*:.*+.:-:+*+==**      =#                               
+                          %%:=  ::=*+===**+**+==:-=*+==*#****     :-@                               
+                            @. ::::#=+*-:::::**======***:         :*#                               
+                         @@%%%@#+-:**#*:::::::*=====#*  *.       .%@                                
+                        @*==========##*-:::::%*===**@   @:*- ::-%@                                  
+                          @@*====*%%+============*##@@    @%#@@                                     
+                                @@@@%*=*#*+==*#**:-@%%@@                                            
+     %:.:*  .-@@                       @@@%%=::  =%%%%%%@@@                                         
+   @*=  =-  .: =@                       @%%@- .*%%%%%%%%%%@@                                        
+ @% +=  @   =#%=.%@                    @@%%%%=%%%%%%%%%%%%%@@                                       
+@#.%%+ :*  :@%##* *@              @@@%%@%%%%%%%%%%%%%@%#####%%@%@@@@@@@@                            
+%.=##% .# :* .%##* +@@@@@@@@@@@@@%%#%%#%%%%%@%%%%%%@%##########%##%%####%@@@                        
+%:*##@%==     :%%%. *%%%%%%%@%#########%@%%@%#@%%%%%#######################%@                   @@  
+  @##@   +   *:      .@%%%%%%@%#########%%@%#%%@%%%#########################%@                 @#   
+  @##@   @%.:=        *@%%%%%%@%#########%##*-##############################%@@@@             @:#   
+  @%#%@    @*-%*:-    =@%%%%%%@%#########%%#%*##############################@%####@@@       @= .%   
+  @@#%@      @%*-:+#%%@%%%%%%%@%###%@@@@@@@###############%%%###%%#########@%######%- :*-%:    .%   
+   @%#@@        @@@@@@%%%%%%%%@@@@        @########################%%%%%%%###########=  :*-*   :@   
+    @#%@         @@%%%%%%%%%@@@           @%#######################%%################%.   . .  .@   
+    @%#%          @@@@@@@@@                %#######################%%#%###############@.       :@@@ 
+    @@#%@                                  @######################%%%##################=       -%*  
+     @%#@@                                 @%#####################%%%#%%###############*        :@  
+      @##@                                  @####################%%%###################%.      =%@  
+      @%#%@                                 @@##################@%@####################%-     -**   
+       @##@                                  @@###############%%%%#####################%-    .%@    
+       @%#%@                                   @%###########@%%%#######################%:    .%     
+        @##@                                     @@@%%%%@%%%@%#########################%    .%      
+         %#%@                                        @@#%##- =%#######################%+  :.%       
+         @##%                                         @###@@*. -%####################%@@%.*@        
+         @@#%@                                        @%#%@@@@@#=-%#################%%=%*@          
+          @%#%@                                        @%#%@@ @*==+#@##############@*=%@            
+          @@##@                                           @ @#*====%%@%##########%%===@             
+           @%#%@                                            #===###*=#@@%######@@#====@             
+            @##@@                              @@@@@@@     @%=**====*@  @@%%%@@ @*====#@@@          
+            @%#%@                           @%#*++=======+==========+@          %*+====*+=*@        
+             @%#@@                         @@=======##================*@@       *===++=====@        
+              %##@                           @========+%*===============%@       @#*===*#*==#@      
+              @##%@                           @%*+======+%*============#+#      @%%=======+==+*%@@  
+               @@@                                 @@%=====******===++=#%%##***======+**====+***==%@
+                                                      @%**+++**#*+**%@@*++*+==================+-=*=%
+                                                                    @%========*##**=============+==%
+                                                                     @%*+===========#%#+==========*@
+                                                                         @*=============+##%%***=#  
+                                                                           @#+====++==========#%@   
+                                                                                     @@%*+*@@       
 ```
 
 # Scrooge
@@ -79,7 +130,7 @@ Once registered, Scrooge tools are available in any Claude Code session.
 > Use scrooge_reindex to index this repository
 ```
 
-Scrooge walks the repo, classifies files, chunks them semantically (using tree-sitter for Kotlin), generates compressed sketches, computes embeddings, and stores everything in a local SQLite database.
+Scrooge walks the repo, classifies files, chunks them semantically (using tree-sitter for Kotlin and TypeScript), generates compressed sketches, computes embeddings, and stores everything in a local SQLite database.
 
 **2. Search the codebase**
 
@@ -122,7 +173,7 @@ Hybrid code search combining FTS5 lexical search and sqlite-vec vector search wi
 | `query` | string | yes | — | Natural language or code identifier |
 | `repo_path` | string | no | cwd | Absolute path to the repository |
 | `filters.module` | string | no | — | Gradle module (e.g. `":app"`) |
-| `filters.language` | string | no | — | Language: `kotlin`, `xml`, `gradle` |
+| `filters.language` | string | no | — | Language: `kotlin`, `typescript`, `xml`, `gradle` |
 | `filters.kind` | string | no | — | Chunk kind: `class`, `function`, `composable`, etc. |
 | `filters.tags` | string[] | no | — | Tags: `["hilt", "compose"]` |
 | `view` | string | no | `"sketch"` | `"sketch"` (compressed) or `"raw"` (full source) |
@@ -222,8 +273,8 @@ src/
 │   └── tools/            # One file per tool (search, map, lookup, reindex, status, statistics)
 ├── indexer/
 │   ├── pipeline.ts       # Orchestrates: classify → chunk → sketch → embed → store
-│   ├── classifier.ts     # File type detection (Kotlin, XML, Gradle, generic)
-│   ├── chunkers/         # Language-specific chunkers (tree-sitter for Kotlin, regex for others)
+│   ├── classifier.ts     # File type detection (Kotlin, TypeScript, XML, Gradle, generic)
+│   ├── chunkers/         # Language-specific chunkers (tree-sitter for Kotlin/TypeScript, regex for others)
 │   └── sketcher.ts       # Compresses chunks into token-efficient sketches
 ├── retrieval/
 │   ├── hybrid.ts         # Orchestrates lexical + vector search with RRF fusion
@@ -256,8 +307,8 @@ Repository files
   └─────────┘     └──────────┘     └──────────┘     └─────────┘     └─────────┘
 ```
 
-1. **Classify** — Detect file type (Kotlin, XML, Gradle, or generic)
-2. **Chunk** — Parse into semantic units using tree-sitter (Kotlin) or regex patterns. Each chunk represents a class, function, composable, XML resource, or Gradle block
+1. **Classify** — Detect file type (Kotlin, TypeScript, XML, Gradle, or generic)
+2. **Chunk** — Parse into semantic units using tree-sitter (Kotlin, TypeScript) or regex patterns. Each chunk represents a class, function, interface, enum, composable, XML resource, or Gradle block
 3. **Sketch** — Compress each chunk into a token-efficient summary preserving signatures and structure but dropping implementation details
 4. **Embed** — Compute 384-dimensional vectors using all-MiniLM-L6-v2 (runs locally, no API calls)
 5. **Store** — Write chunks, sketches, and vectors to SQLite with FTS5 and sqlite-vec indexes
@@ -340,7 +391,7 @@ rm ~/.scrooge/scrooge.db
 
 ### Test fixtures
 
-Test fixtures in `test/fixtures/` include Kotlin source files, Android XML layouts, and Gradle build scripts — covering the primary file types Scrooge indexes.
+Test fixtures in `test/fixtures/` include Kotlin source files, TypeScript/TSX modules, Android XML layouts, and Gradle build scripts — covering the primary file types Scrooge indexes.
 
 ### Conventions
 
@@ -358,6 +409,7 @@ Test fixtures in `test/fixtures/` include Kotlin source files, Android XML layou
 | `sqlite-vec` | ^0.1.6 | Vector similarity search extension |
 | `tree-sitter` | ^0.21.1 | Incremental parsing framework (native) |
 | `tree-sitter-kotlin` | ^0.3.8 | Kotlin grammar for tree-sitter |
+| `tree-sitter-typescript` | ^0.23.2 | TypeScript/TSX grammar for tree-sitter |
 | `@xenova/transformers` | ^2.17.0 | Local ML embeddings (all-MiniLM-L6-v2) |
 | `zod` | ^3.24.0 | Runtime schema validation |
 | `typescript` | ^5.7.0 | Type system and compiler |

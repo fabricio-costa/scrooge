@@ -137,7 +137,7 @@ Sources: lexical 30% | vector 25% | both 45%
 ## Architecture
 
 - **MCP Server** (`src/server/`): Stdio transport, 6 tools (search, map, lookup, reindex, status, statistics)
-- **Indexer** (`src/indexer/`): Pipeline that classifies files, chunks them semantically (tree-sitter for Kotlin), generates sketches, and computes embeddings
+- **Indexer** (`src/indexer/`): Pipeline that classifies files, chunks them semantically (tree-sitter for Kotlin and TypeScript), generates sketches, and computes embeddings
 - **Retrieval** (`src/retrieval/`): Hybrid search (FTS5 lexical + sqlite-vec vector) with RRF fusion and token-budgeted packaging
 - **Repo Map** (`src/repomap/`): Directory tree and hierarchical summaries from indexed data
 - **Storage** (`src/storage/`): SQLite with better-sqlite3, FTS5 for lexical search, sqlite-vec for vector search
@@ -160,7 +160,7 @@ npx vitest run test/chunkers.test.ts       # Specific file
 npx vitest --watch                         # Watch mode
 ```
 
-Test fixtures are located in `test/fixtures/` (Kotlin, XML, Gradle samples).
+Test fixtures are located in `test/fixtures/` (Kotlin, TypeScript, XML, Gradle samples).
 
 ## Key Conventions
 
@@ -174,6 +174,6 @@ Test fixtures are located in `test/fixtures/` (Kotlin, XML, Gradle samples).
 
 - `@modelcontextprotocol/sdk` -- MCP protocol
 - `better-sqlite3` + `sqlite-vec` -- Storage with vector search
-- `tree-sitter` + `tree-sitter-kotlin` -- Kotlin AST parsing
+- `tree-sitter` + `tree-sitter-kotlin` + `tree-sitter-typescript` -- AST parsing (Kotlin, TypeScript)
 - `@xenova/transformers` -- Local embeddings (all-MiniLM-L6-v2)
 - `zod` -- Schema validation

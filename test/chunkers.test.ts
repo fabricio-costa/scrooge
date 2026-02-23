@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { kotlinChunker } from "../src/indexer/chunkers/kotlin.js";
+import { typescriptChunker } from "../src/indexer/chunkers/typescript.js";
 import { xmlAndroidChunker } from "../src/indexer/chunkers/xml-android.js";
 import { gradleChunker } from "../src/indexer/chunkers/gradle.js";
 import { genericChunker } from "../src/indexer/chunkers/generic.js";
@@ -246,6 +247,106 @@ describe("gradle chunker", () => {
     expect(chunks.length).toBe(1);
     expect(chunks[0].kind).toBe("gradle_settings");
     expect(chunks[0].tags).toContain("gradle");
+  });
+});
+
+describe("typescript chunker", () => {
+  it("should support typescript files", () => {
+    expect(typescriptChunker.supports("file.ts", "typescript")).toBe(true);
+    expect(typescriptChunker.supports("file.tsx", "typescript")).toBe(true);
+    expect(typescriptChunker.supports("file.js", "javascript")).toBe(false);
+  });
+
+  it("should chunk UserService.ts into a class", () => {
+    const content = fixture("UserService.ts");
+    const chunks = typescriptChunker.chunk("src/services/UserService.ts", content);
+
+    const classChunk = chunks.find((c) => c.kind === "class");
+    expect(classChunk).toBeDefined();
+    expect(classChunk!.symbolName).toBe("UserService");
+    expect(classChunk!.signature).toContain("export class UserService");
+    expect(classChunk!.tags).toContain("async");
+    expect(classChunk!.tags).toContain("export");
+    expect(classChunk!.textSketch).toBeTruthy();
+    expect(classChunk!.defines).toContain("src/services/UserService.ts.UserService");
+    expect(classChunk!.contentHash).toMatch(/^[a-f0-9]{16}$/);
+  });
+
+  it("should chunk types.ts interface", () => {
+    const content = fixture("types.ts");
+    const chunks = typescriptChunker.chunk("src/types.ts", content);
+
+    const interfaceChunk = chunks.find((c) => c.kind === "interface");
+    expect(interfaceChunk).toBeDefined();
+    expect(interfaceChunk!.symbolName).toBe("User");
+  });
+
+  it("should chunk types.ts type alias", () => {
+    const content = fixture("types.ts");
+    const chunks = typescriptChunker.chunk("src/types.ts", content);
+
+    const typeAliasChunks = chunks.filter((c) => c.kind === "type_alias");
+    expect(typeAliasChunks.length).toBeGreaterThanOrEqual(1);
+
+    const createUserDto = typeAliasChunks.find((c) => c.symbolName === "CreateUserDto");
+    expect(createUserDto).toBeDefined();
+  });
+
+  it("should chunk types.ts enum", () => {
+    const content = fixture("types.ts");
+    const chunks = typescriptChunker.chunk("src/types.ts", content);
+
+    const enumChunk = chunks.find((c) => c.kind === "enum");
+    expect(enumChunk).toBeDefined();
+    expect(enumChunk!.symbolName).toBe("UserRole");
+    expect(enumChunk!.textSketch).toContain("Admin");
+  });
+
+  it("should chunk types.ts top-level const", () => {
+    const content = fixture("types.ts");
+    const chunks = typescriptChunker.chunk("src/types.ts", content);
+
+    const constChunk = chunks.find((c) => c.symbolName === "DEFAULT_PAGE_SIZE");
+    expect(constChunk).toBeDefined();
+    expect(constChunk!.kind).toBe("function");
+  });
+
+  it("should chunk TSX file without errors", () => {
+    const content = fixture("ApiClient.tsx");
+    const chunks = typescriptChunker.chunk("src/components/ApiClient.tsx", content);
+
+    expect(chunks.length).toBeGreaterThan(0);
+    // Should find the ApiClient arrow function component
+    const apiClient = chunks.find((c) => c.symbolName === "ApiClient");
+    expect(apiClient).toBeDefined();
+  });
+
+  it("should extract imports into uses", () => {
+    const content = fixture("UserService.ts");
+    const chunks = typescriptChunker.chunk("src/services/UserService.ts", content);
+
+    const classChunk = chunks.find((c) => c.kind === "class");
+    expect(classChunk).toBeDefined();
+    expect(classChunk!.uses.length).toBeGreaterThan(0);
+  });
+
+  it("should have valid chunk IDs", () => {
+    const content = fixture("UserService.ts");
+    const chunks = typescriptChunker.chunk("src/services/UserService.ts", content);
+
+    for (const chunk of chunks) {
+      expect(chunk.id).toMatch(/^[a-f0-9]{24}$/);
+      expect(chunk.contentHash).toMatch(/^[a-f0-9]{16}$/);
+    }
+  });
+
+  it("should include JSDoc in sketch", () => {
+    const content = fixture("UserService.ts");
+    const chunks = typescriptChunker.chunk("src/services/UserService.ts", content);
+
+    const classChunk = chunks.find((c) => c.kind === "class");
+    expect(classChunk).toBeDefined();
+    expect(classChunk!.textSketch).toContain("Service responsible for user management");
   });
 });
 

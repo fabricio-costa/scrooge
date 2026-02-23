@@ -7,6 +7,7 @@ export default tseslint.config(
       parserOptions: {
         projectService: {
           allowDefaultProject: ['test/*.test.ts'],
+          maximumDefaultProjectFileMatchCount_THIS_WILL_SLOW_DOWN_LINTING: 16,
         },
         tsconfigRootDir: import.meta.dirname,
       },
@@ -19,6 +20,6 @@ export default tseslint.config(
     },
   },
   {
-    ignores: ['dist/', 'node_modules/', '*.js', '!eslint.config.js'],
+    ignores: ['dist/', 'node_modules/', 'test/fixtures/', '*.js', '!eslint.config.js'],
   },
 );

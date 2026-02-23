@@ -32,13 +32,3 @@ export async function embed(text: string): Promise<Float32Array> {
   return new Float32Array(result.data as ArrayLike<number>);
 }
 
-/**
- * Generate embeddings for multiple texts in batch.
- */
-export async function embedBatch(texts: string[]): Promise<Float32Array[]> {
-  const results: Float32Array[] = [];
-  for (const text of texts) {
-    results.push(await embed(text));
-  }
-  return results;
-}

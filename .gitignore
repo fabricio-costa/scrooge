@@ -1,9 +1,9 @@
 node_modules/
 dist/
 *.js
+!eslint.config.js
 *.d.ts
 *.js.map
-!vitest.config.ts
 
 # SQLite databases
 *.db
@@ -33,3 +33,6 @@ coverage/
 
 # Build artifacts
 *.tsbuildinfo
+
+# Notes
+pensamentos e viagens.txt

@@ -215,14 +215,18 @@ describe("gradle chunker", () => {
     const content = fixture("build.gradle.kts");
     const chunks = gradleChunker.chunk("build.gradle.kts", content);
 
-    expect(chunks.length).toBeGreaterThanOrEqual(2); // at least plugins + dependencies
+    // plugins + android + dependencies = 3 blocks
+    expect(chunks.length).toBe(3);
 
     const pluginsChunk = chunks.find((c) => c.kind === "gradle_plugins");
     expect(pluginsChunk).toBeDefined();
 
+    const androidChunk = chunks.find((c) => c.kind === "gradle_android");
+    expect(androidChunk).toBeDefined();
+
     const depsChunk = chunks.find((c) => c.kind === "gradle_dependencies");
     expect(depsChunk).toBeDefined();
-    expect(depsChunk!.uses.length).toBeGreaterThan(0);
+    expect(depsChunk!.uses.length).toBe(9); // 9 dependency declarations
   });
 
   it("should extract dependency names", () => {
@@ -232,6 +236,16 @@ describe("gradle chunker", () => {
 
     expect(depsChunk!.uses).toContain("androidx.core:core-ktx:1.12.0");
     expect(depsChunk!.uses).toContain("com.google.dagger:hilt-android:2.50");
+    expect(depsChunk!.uses).toContain("com.squareup.retrofit2:retrofit:2.9.0");
+  });
+
+  it("should chunk settings.gradle.kts as gradle_settings", () => {
+    const content = fixture("settings.gradle.kts");
+    const chunks = gradleChunker.chunk("settings.gradle.kts", content);
+
+    expect(chunks.length).toBe(1);
+    expect(chunks[0].kind).toBe("gradle_settings");
+    expect(chunks[0].tags).toContain("gradle");
   });
 });
 

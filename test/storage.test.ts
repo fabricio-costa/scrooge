@@ -132,9 +132,9 @@ describe("vector operations", () => {
 });
 
 describe("index metadata", () => {
-  it("should return null for non-indexed repo", () => {
+  it("should return undefined for non-indexed repo", () => {
     const meta = getIndexMeta(db, "/non/existent");
-    expect(meta).toBeNull();
+    expect(meta).toBeFalsy();
   });
 
   it("should upsert and retrieve index metadata", () => {

@@ -7,6 +7,7 @@ import { xmlAndroidChunker } from "./chunkers/xml-android.js";
 import { gradleChunker } from "./chunkers/gradle.js";
 import { genericChunker } from "./chunkers/generic.js";
 import { typescriptChunker } from "./chunkers/typescript.js";
+import { dartChunker } from "./chunkers/dart.js";
 import type { ChunkerPlugin } from "./chunkers/types.js";
 import { embed } from "./embedder.js";
 import {

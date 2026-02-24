@@ -1,21 +1,24 @@
+import { basename } from "node:path";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { openDb, getIndexMeta, recordToolCall } from "../../storage/db.js";
 import { getConfig } from "../../utils/config.js";
 import { isGitRepo, getHeadCommit } from "../../utils/git.js";
+import { validateRepoPath } from "../../utils/path-validation.js";
 
 export function registerStatusTool(server: McpServer): void {
   server.tool(
     "scrooge_status",
     "Get information about the Scrooge index for a repository: last indexed commit, total chunks, freshness.",
     {
-      repo_path: z.string().describe("Absolute path to the repository (defaults to cwd)").optional(),
+      repo_path: z.string().max(500).describe("Absolute path to the repository (defaults to cwd)").optional(),
     },
     async ({ repo_path }) => {
       const startTime = Date.now();
-      const repoPath = repo_path ?? process.cwd();
+      const repoPath = validateRepoPath(repo_path ?? process.cwd());
       const config = getConfig();
       const db = openDb(config.dbPath);
+      const repoName = basename(repoPath);
 
       try {
         const meta = getIndexMeta(db, repoPath);
@@ -37,7 +40,7 @@ export function registerStatusTool(server: McpServer): void {
                 text: JSON.stringify(
                   {
                     status: "not_indexed",
-                    repo_path: repoPath,
+                    repo: repoName,
                     message: "Repository has not been indexed yet. Run scrooge_reindex first.",
                   },
                   null,
@@ -70,7 +73,7 @@ export function registerStatusTool(server: McpServer): void {
               text: JSON.stringify(
                 {
                   status: "indexed",
-                  repo_path: repoPath,
+                  repo: repoName,
                   last_commit_sha: meta.last_commit_sha,
                   last_indexed_at: meta.last_indexed_at,
                   total_chunks: meta.total_chunks,

@@ -1,29 +1,32 @@
+import { basename } from "node:path";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { openDb, recordToolCall } from "../../storage/db.js";
 import { getConfig } from "../../utils/config.js";
 import { runPipeline } from "../../indexer/pipeline.js";
 import { isGitRepo } from "../../utils/git.js";
+import { validateRepoPath } from "../../utils/path-validation.js";
 
 export function registerReindexTool(server: McpServer): void {
   server.tool(
     "scrooge_reindex",
     "Trigger indexing of a repository. By default uses incremental mode (only re-indexes files changed since last index). Use incremental=false for a full re-index.",
     {
-      repo_path: z.string().optional().describe("Absolute path to the repository (defaults to cwd)"),
+      repo_path: z.string().max(500).optional().describe("Absolute path to the repository (defaults to cwd)"),
       incremental: z.boolean().optional().describe("Incremental index via git diff (default true)"),
     },
     async ({ repo_path, incremental }) => {
       const startTime = Date.now();
-      const repoPath = repo_path ?? process.cwd();
+      const repoPath = validateRepoPath(repo_path ?? process.cwd());
       const isIncremental = incremental !== false;
+      const repoName = basename(repoPath);
 
       if (!isGitRepo(repoPath)) {
         return {
           content: [
             {
               type: "text" as const,
-              text: JSON.stringify({ error: "Not a git repository", repo_path: repoPath }),
+              text: JSON.stringify({ error: "Not a git repository", repo: repoName }),
             },
           ],
         };
@@ -56,7 +59,7 @@ export function registerReindexTool(server: McpServer): void {
               text: JSON.stringify(
                 {
                   status: "success",
-                  repo_path: repoPath,
+                  repo: repoName,
                   ...stats,
                 },
                 null,

@@ -6,14 +6,15 @@ import { hybridSearch } from "../../retrieval/hybrid.js";
 import { packageResults, type ViewMode } from "../../retrieval/packager.js";
 import { estimateTokens } from "../../utils/tokens.js";
 import { ensureFreshIndex, formatReindexNote } from "../../utils/freshness.js";
+import { validateRepoPath } from "../../utils/path-validation.js";
 
 export function registerSearchTool(server: McpServer): void {
   server.tool(
     "scrooge_search",
     "Hybrid code search (lexical + vector) across an indexed repository. Returns ranked chunks with token-budgeted snippets. Use sketch view for planning, raw view for implementation.",
     {
-      query: z.string().describe("Search query (natural language or identifier)"),
-      repo_path: z.string().optional().describe("Absolute path to the repository (defaults to cwd)"),
+      query: z.string().min(1).max(1000).describe("Search query (natural language or identifier)"),
+      repo_path: z.string().max(500).optional().describe("Absolute path to the repository (defaults to cwd)"),
       filters: z.object({
         module: z.string().optional().describe("Filter by Gradle module (e.g., ':app')"),
         language: z.string().optional().describe("Filter by language (kotlin, xml, gradle)"),
@@ -21,12 +22,12 @@ export function registerSearchTool(server: McpServer): void {
         tags: z.array(z.string()).optional().describe("Filter by tags (e.g., ['hilt', 'compose'])"),
       }).optional(),
       view: z.enum(["sketch", "raw"]).optional().describe("sketch (compressed, default) or raw (full source)"),
-      max_results: z.number().optional().describe("Maximum results to return (default 8)"),
-      token_budget: z.number().optional().describe("Maximum tokens in response (default 3000)"),
+      max_results: z.number().int().min(1).max(100).optional().describe("Maximum results to return (default 8)"),
+      token_budget: z.number().int().min(100).max(50000).optional().describe("Maximum tokens in response (default 3000)"),
     },
     async ({ query, repo_path, filters, view, max_results, token_budget }) => {
       const startTime = Date.now();
-      const repoPath = repo_path ?? process.cwd();
+      const repoPath = validateRepoPath(repo_path ?? process.cwd());
       const config = getConfig();
       const db = openDb(config.dbPath);
 

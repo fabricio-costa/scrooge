@@ -6,19 +6,20 @@ import { generateTree, renderTree } from "../../repomap/tree.js";
 import { getModuleSummaries, getFileSummaries } from "../../repomap/summaries.js";
 import { estimateTokens } from "../../utils/tokens.js";
 import { ensureFreshIndex, formatReindexNote } from "../../utils/freshness.js";
+import { validateRepoPath } from "../../utils/path-validation.js";
 
 export function registerMapTool(server: McpServer): void {
   server.tool(
     "scrooge_map",
     "Get a repository map: directory tree and hierarchical summaries. Use 'repo' level for overview, 'modules' for module details, 'files' for per-file symbols (use with module filter for large repos).",
     {
-      repo_path: z.string().optional().describe("Absolute path to the repository (defaults to cwd)"),
+      repo_path: z.string().max(500).optional().describe("Absolute path to the repository (defaults to cwd)"),
       level: z.enum(["repo", "modules", "files"]).optional().describe("Detail level: repo (compact tree + modules), modules (module summaries only), files (per-file symbols)"),
       module: z.string().optional().describe("Focus on a specific module (e.g., ':app', ':core:common')"),
     },
     async ({ repo_path, level, module }) => {
       const startTime = Date.now();
-      const repoPath = repo_path ?? process.cwd();
+      const repoPath = validateRepoPath(repo_path ?? process.cwd());
       const config = getConfig();
       const db = openDb(config.dbPath);
 

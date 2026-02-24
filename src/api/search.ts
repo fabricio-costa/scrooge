@@ -39,7 +39,9 @@ export async function search(
       params.tokenBudget ?? config.defaultTokenBudget,
     );
 
-    const tokensRaw = results.reduce((sum, r) => sum + estimateTokens(r.chunk.text_raw), 0);
+    const tokensRaw = results
+      .slice(0, packaged.results.length)
+      .reduce((sum, r) => sum + estimateTokens(r.chunk.text_raw), 0);
     const sources = { lexical: 0, vector: 0, both: 0 };
     for (const r of results) {
       sources[r.source]++;

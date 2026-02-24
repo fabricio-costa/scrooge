@@ -1,6 +1,6 @@
 import { extname, basename } from "node:path";
 
-export type FileLanguage = "kotlin" | "typescript" | "xml" | "gradle" | "other";
+export type FileLanguage = "kotlin" | "typescript" | "dart" | "xml" | "gradle" | "other";
 
 export function classifyFile(filePath: string): FileLanguage {
   const ext = extname(filePath).toLowerCase();

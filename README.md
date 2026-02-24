@@ -319,6 +319,7 @@ Repository files
 |----------|--------|-------------|
 | **Kotlin** | tree-sitter AST | `class`, `viewmodel`, `composable`, `function`, `method`, `api_interface`, `dao`, `entity` |
 | **TypeScript/TSX** | tree-sitter AST | `class`, `function`, `method`, `interface`, `type_alias`, `enum` |
+| **Dart/Flutter** | tree-sitter AST | `class`, `function`, `method`, `enum`, `mixin`, `extension`, `type_alias` |
 | **XML** (Android) | Regex patterns | `manifest_component`, `nav_destination`, `layout`, `values` |
 | **Gradle** | Regex patterns | `gradle_plugins`, `gradle_android`, `gradle_dependencies`, `gradle_settings` |
 | **Other** | Line-based splitter | `generic_block`, `generic_file` |

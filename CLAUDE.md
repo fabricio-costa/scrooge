@@ -160,7 +160,7 @@ npx vitest run test/chunkers.test.ts       # Specific file
 npx vitest --watch                         # Watch mode
 ```
 
-Test fixtures are located in `test/fixtures/` (Kotlin, TypeScript, XML, Gradle samples).
+Test fixtures are located in `test/fixtures/` (Kotlin, TypeScript, Dart, XML, Gradle samples).
 
 ## Key Conventions
 

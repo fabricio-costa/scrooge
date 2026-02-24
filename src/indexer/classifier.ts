@@ -22,5 +22,9 @@ export function classifyFile(filePath: string): FileLanguage {
     return "typescript";
   }
 
+  if (ext === ".dart") {
+    return "dart";
+  }
+
   return "other";
 }

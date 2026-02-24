@@ -91,6 +91,7 @@ export async function lookup(
       tokens_sent: estimateTokens(responseText),
       tokens_raw: tokensRaw,
       channel: ctx.channel,
+      model: ctx.model,
       metadata: {
         symbol: params.symbol,
         definitionCount: definitions.length,

@@ -62,7 +62,7 @@ export default function (pi: PiExtensionAPI): void {
           maxResults: params.max_results as number | undefined,
           tokenBudget: params.token_budget as number | undefined,
         },
-        { channel: CHANNEL, repoPath: params.repo_path as string | undefined },
+        { channel: CHANNEL, repoPath: params.repo_path as string | undefined, model: process.env.SCROOGE_MODEL },
       );
       return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }], details: {} };
     },
@@ -84,7 +84,7 @@ export default function (pi: PiExtensionAPI): void {
           symbol: params.symbol as string,
           includeUsages: params.include_usages as boolean | undefined,
         },
-        { channel: CHANNEL, repoPath: params.repo_path as string | undefined },
+        { channel: CHANNEL, repoPath: params.repo_path as string | undefined, model: process.env.SCROOGE_MODEL },
       );
       return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }], details: {} };
     },
@@ -106,7 +106,7 @@ export default function (pi: PiExtensionAPI): void {
           level: params.level as "repo" | "modules" | "files" | undefined,
           module: params.module as string | undefined,
         },
-        { channel: CHANNEL, repoPath: params.repo_path as string | undefined },
+        { channel: CHANNEL, repoPath: params.repo_path as string | undefined, model: process.env.SCROOGE_MODEL },
       );
       return { content: [{ type: "text", text: result.content }], details: {} };
     },
@@ -124,7 +124,7 @@ export default function (pi: PiExtensionAPI): void {
     async execute(_toolCallId, params) {
       const result = await reindex(
         { incremental: params.incremental as boolean | undefined },
-        { channel: CHANNEL, repoPath: params.repo_path as string | undefined },
+        { channel: CHANNEL, repoPath: params.repo_path as string | undefined, model: process.env.SCROOGE_MODEL },
       );
       return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }], details: {} };
     },
@@ -140,7 +140,7 @@ export default function (pi: PiExtensionAPI): void {
     }),
     async execute(_toolCallId, params) {
       const result = await status(
-        { channel: CHANNEL, repoPath: params.repo_path as string | undefined },
+        { channel: CHANNEL, repoPath: params.repo_path as string | undefined, model: process.env.SCROOGE_MODEL },
       );
       return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }], details: {} };
     },
@@ -160,7 +160,7 @@ export default function (pi: PiExtensionAPI): void {
     async execute(_toolCallId, params) {
       const result = await statistics(
         { period: params.period as "today" | "week" | "month" | "all" | undefined },
-        { channel: CHANNEL, repoPath: params.repo_path as string | undefined },
+        { channel: CHANNEL, repoPath: params.repo_path as string | undefined, model: process.env.SCROOGE_MODEL },
       );
       return { content: [{ type: "text", text: result.report }], details: {} };
     },

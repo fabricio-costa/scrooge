@@ -100,6 +100,7 @@ export async function map(
       tokens_sent: tokensSent,
       tokens_raw: tokensRaw,
       channel: ctx.channel,
+      model: ctx.model,
       metadata: { level: detailLevel, module: params.module ?? null, autoReindexed: freshness.reindexed },
     });
 

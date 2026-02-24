@@ -48,6 +48,7 @@ export async function status(
       tokens_sent: 0,
       tokens_raw: 0,
       channel: ctx.channel,
+      model: ctx.model,
       metadata: { freshness },
     });
 

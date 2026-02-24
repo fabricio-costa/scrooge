@@ -22,7 +22,7 @@ export function registerSearchTool(server: McpServer): void {
     async ({ query, repo_path, filters, view, max_results, token_budget }) => {
       const result = await search(
         { query, filters, view, maxResults: max_results, tokenBudget: token_budget },
-        { channel: "mcp", repoPath: repo_path },
+        { channel: "mcp", repoPath: repo_path, model: process.env.SCROOGE_MODEL },
       );
       return {
         content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],

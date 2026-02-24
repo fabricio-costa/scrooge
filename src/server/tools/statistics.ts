@@ -16,7 +16,7 @@ export function registerStatisticsTool(server: McpServer): void {
     async ({ repo_path, period }) => {
       const result = await statistics(
         { period },
-        { channel: "mcp", repoPath: repo_path },
+        { channel: "mcp", repoPath: repo_path, model: process.env.SCROOGE_MODEL },
       );
       return {
         content: [{ type: "text" as const, text: result.report }],

@@ -56,6 +56,7 @@ export async function search(
       tokens_sent: packaged.totalTokens,
       tokens_raw: tokensRaw,
       channel: ctx.channel,
+      model: ctx.model,
       metadata: {
         query: params.query,
         resultCount: packaged.results.length,

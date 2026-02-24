@@ -182,7 +182,7 @@ Hybrid code search combining FTS5 lexical search and sqlite-vec vector search wi
 | `query` | string | yes | — | Natural language or code identifier |
 | `repo_path` | string | no | cwd | Absolute path to the repository |
 | `filters.module` | string | no | — | Gradle module (e.g. `":app"`) |
-| `filters.language` | string | no | — | Language: `kotlin`, `typescript`, `dart`, `xml`, `gradle` |
+| `filters.language` | string | no | — | Language: `kotlin`, `typescript`, `dart`, `python`, `xml`, `gradle` |
 | `filters.kind` | string | no | — | Chunk kind: `class`, `function`, `composable`, etc. |
 | `filters.tags` | string[] | no | — | Tags: `["hilt", "compose"]` |
 | `view` | string | no | `"sketch"` | `"sketch"` (compressed) or `"raw"` (full source) |
@@ -291,8 +291,8 @@ src/
 │   └── tools/            # Thin MCP adapters: Zod schema → API call → JSON response
 ├── indexer/
 │   ├── pipeline.ts       # Orchestrates: classify → chunk → sketch → embed → store
-│   ├── classifier.ts     # File type detection (Kotlin, TypeScript, Dart, XML, Gradle, generic)
-│   ├── chunkers/         # Language-specific chunkers (tree-sitter for Kotlin/TypeScript/Dart, regex for others)
+│   ├── classifier.ts     # File type detection (Kotlin, TypeScript, Dart, Python, XML, Gradle, generic)
+│   ├── chunkers/         # Language-specific chunkers (tree-sitter for Kotlin/TypeScript/Dart/Python, regex for others)
 │   └── sketcher.ts       # Compresses chunks into token-efficient sketches
 ├── retrieval/
 │   ├── hybrid.ts         # Orchestrates lexical + vector search with RRF fusion
@@ -326,7 +326,7 @@ Repository files
   └─────────┘     └──────────┘     └──────────┘     └─────────┘     └─────────┘
 ```
 
-1. **Classify** — Detect file type by extension (`.kt` → Kotlin, `.ts`/`.tsx` → TypeScript, `.dart` → Dart, `.xml` → XML, `.gradle.kts` → Gradle, everything else → generic)
+1. **Classify** — Detect file type by extension (`.kt` → Kotlin, `.ts`/`.tsx` → TypeScript, `.dart` → Dart, `.py` → Python, `.xml` → XML, `.gradle.kts` → Gradle, everything else → generic)
 2. **Chunk** — Parse into semantic units. See [Supported Languages](#supported-languages) below
 3. **Sketch** — Compress each chunk into a token-efficient summary. See [Sketches](#sketches) below
 4. **Embed** — Compute vector embeddings for semantic search. See [Embeddings](#embeddings) below
@@ -339,6 +339,7 @@ Repository files
 | **Kotlin** | tree-sitter AST | `class`, `viewmodel`, `composable`, `function`, `method`, `api_interface`, `dao`, `entity` |
 | **TypeScript/TSX** | tree-sitter AST | `class`, `function`, `method`, `interface`, `type_alias`, `enum` |
 | **Dart/Flutter** | tree-sitter AST | `class`, `function`, `method`, `enum`, `mixin`, `extension`, `type_alias` |
+| **Python** | tree-sitter AST | `class`, `dataclass`, `function`, `method` |
 | **XML** (Android) | Regex patterns | `manifest_component`, `nav_destination`, `layout`, `values` |
 | **Gradle** | Regex patterns | `gradle_plugins`, `gradle_android`, `gradle_dependencies`, `gradle_settings` |
 | **Other** | Line-based splitter | `generic_block`, `generic_file` |
@@ -472,7 +473,7 @@ rm ~/.scrooge/scrooge.db
 
 ### Test fixtures
 
-Test fixtures in `test/fixtures/` include Kotlin source files, TypeScript/TSX modules, Dart/Flutter files, Android XML layouts, and Gradle build scripts — covering the primary file types Scrooge indexes.
+Test fixtures in `test/fixtures/` include Kotlin source files, TypeScript/TSX modules, Dart/Flutter files, Python modules, Android XML layouts, and Gradle build scripts — covering the primary file types Scrooge indexes.
 
 ### Conventions
 
@@ -492,6 +493,7 @@ Test fixtures in `test/fixtures/` include Kotlin source files, TypeScript/TSX mo
 | `tree-sitter-kotlin` | ^0.3.8 | Kotlin grammar for tree-sitter |
 | `tree-sitter-typescript` | ^0.23.2 | TypeScript/TSX grammar for tree-sitter |
 | `tree-sitter-dart` | github:UserNobody14#c1222f5 | Dart grammar for tree-sitter (ABI 14 compatible) |
+| `tree-sitter-python` | ^0.21.0 | Python grammar for tree-sitter |
 | `@xenova/transformers` | ^2.17.0 | Local ML embeddings (all-MiniLM-L6-v2) |
 | `zod` | ^3.24.0 | Runtime schema validation |
 | `typescript` | ^5.7.0 | Type system and compiler |

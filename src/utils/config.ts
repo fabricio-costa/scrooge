@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import { existsSync, mkdirSync } from "node:fs";
+import { existsSync, mkdirSync, chmodSync } from "node:fs";
 
 export interface ScroogeConfig {
   dbPath: string;
@@ -29,10 +29,12 @@ export function getConfig(overrides?: Partial<ScroogeConfig>): ScroogeConfig {
   if (_config && !overrides) return _config;
   _config = { ...DEFAULT_CONFIG, ...overrides };
 
-  // Ensure db directory exists
+  // Ensure db directory exists with restrictive permissions
   const dbDir = join(_config.dbPath, "..");
   if (!existsSync(dbDir)) {
-    mkdirSync(dbDir, { recursive: true });
+    mkdirSync(dbDir, { recursive: true, mode: 0o700 });
+  } else {
+    try { chmodSync(dbDir, 0o700); } catch { /* may not own dir */ }
   }
 
   return _config;

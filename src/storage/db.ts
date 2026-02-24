@@ -1,3 +1,4 @@
+import { chmodSync } from "node:fs";
 import Database from "better-sqlite3";
 import * as sqliteVec from "sqlite-vec";
 
@@ -77,6 +78,17 @@ export function openDb(dbPath?: string): Database.Database {
   sqliteVec.load(db);
 
   runMigrations(db);
+
+  // Restrict file permissions (skip for in-memory DBs)
+  if (resolvedPath !== ":memory:" && !resolvedPath.startsWith(":")) {
+    try { chmodSync(resolvedPath, 0o600); } catch { /* may not own file */ }
+  }
+
+  // TTL cleanup: remove tool_calls older than 90 days
+  try {
+    db.prepare("DELETE FROM tool_calls WHERE called_at < datetime('now', '-90 days')").run();
+  } catch { /* table may not exist yet on first run */ }
+
   return db;
 }
 
@@ -259,8 +271,12 @@ export function insertVecEmbedding(db: Database.Database, id: string, embedding:
 
 export function deleteVecByIds(db: Database.Database, ids: string[]): void {
   if (ids.length === 0) return;
-  const placeholders = ids.map(() => "?").join(",");
-  db.prepare(`DELETE FROM chunks_vec WHERE id IN (${placeholders})`).run(...ids);
+  const BATCH = 500;
+  for (let i = 0; i < ids.length; i += BATCH) {
+    const batch = ids.slice(i, i + BATCH);
+    const placeholders = batch.map(() => "?").join(",");
+    db.prepare(`DELETE FROM chunks_vec WHERE id IN (${placeholders})`).run(...batch);
+  }
 }
 
 export function getChunkIdsByPath(db: Database.Database, repoPath: string, filePath: string): string[] {

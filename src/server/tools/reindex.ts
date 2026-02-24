@@ -13,7 +13,7 @@ export function registerReindexTool(server: McpServer): void {
     async ({ repo_path, incremental }) => {
       const result = await reindex(
         { incremental },
-        { channel: "mcp", repoPath: repo_path },
+        { channel: "mcp", repoPath: repo_path, model: process.env.SCROOGE_MODEL },
       );
       return {
         content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],

@@ -14,7 +14,7 @@ export function registerLookupTool(server: McpServer): void {
     async ({ symbol, repo_path, include_usages }) => {
       const result = await lookup(
         { symbol, includeUsages: include_usages },
-        { channel: "mcp", repoPath: repo_path },
+        { channel: "mcp", repoPath: repo_path, model: process.env.SCROOGE_MODEL },
       );
       return {
         content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],

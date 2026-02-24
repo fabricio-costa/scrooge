@@ -41,6 +41,7 @@ export async function reindex(
       tokens_sent: 0,
       tokens_raw: 0,
       channel: ctx.channel,
+      model: ctx.model,
       metadata: { ...stats, incremental: isIncremental },
     });
 

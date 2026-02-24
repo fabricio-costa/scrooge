@@ -14,7 +14,7 @@ export function registerMapTool(server: McpServer): void {
     async ({ repo_path, level, module }) => {
       const result = await map(
         { level, module },
-        { channel: "mcp", repoPath: repo_path },
+        { channel: "mcp", repoPath: repo_path, model: process.env.SCROOGE_MODEL },
       );
       return {
         content: [{ type: "text" as const, text: result.content }],

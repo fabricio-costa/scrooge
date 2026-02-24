@@ -130,7 +130,7 @@ Once registered, Scrooge tools are available in any Claude Code session.
 > Use scrooge_reindex to index this repository
 ```
 
-Scrooge walks the repo, classifies files, chunks them semantically (using tree-sitter for Kotlin and TypeScript), generates compressed sketches, computes embeddings, and stores everything in a local SQLite database.
+Scrooge walks the repo, classifies files, chunks them semantically (using tree-sitter for Kotlin, TypeScript, and Dart), generates compressed sketches, computes embeddings, and stores everything in a local SQLite database.
 
 **2. Search the codebase**
 

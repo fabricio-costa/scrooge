@@ -261,16 +261,31 @@ Period: all time (since Feb 20, 2026)
 
 ### Token Savings
 Tokens delivered: 45,200
-Raw equivalent:  312,000
-Saved:           266,800 (85.5%)
+Raw equivalent:  120,000
+Saved:           74,800 (62.3%)
+
+### Savings by Tool
+search: 1,200 delivered / 8,500 raw (85.9% saved)
+lookup: 600 delivered / 3,500 raw (82.9% saved)
+map:    200 delivered / 2,000 raw (90.0% saved)
 
 ### Usage (70 total calls)
 search: 42 | map: 15 | lookup: 8 | reindex: 3 | status: 2
+
+### Models
+claude-opus-4-6: 30 calls (25,000 tokens)
+claude-sonnet-4-5: 40 calls (20,200 tokens)
 
 ### Search Insights
 Avg results/query: 5.2 | Avg tokens/query: 1,076
 Sources: lexical 30% | vector 25% | both 45%
 ```
+
+**Environment variables:**
+
+| Variable | Description |
+|----------|-------------|
+| `SCROOGE_MODEL` | AI model identifier (e.g., `claude-opus-4-6`). Recorded in telemetry for per-model usage breakdown in `scrooge_statistics`. |
 
 ## Architecture
 

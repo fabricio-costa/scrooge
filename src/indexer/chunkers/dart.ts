@@ -59,9 +59,14 @@ function visitNode(
       case "function_definition":
         processFunction(child, filePath, lines, imports, chunks, commentStartLine);
         break;
-      case "initialized_variable_definition":
-      case "static_final_declaration":
-        processTopLevelVariable(child, filePath, lines, imports, chunks, commentStartLine);
+      case "static_final_declaration_list":
+        // Top-level: `final x = ...;` parses as final_builtin + static_final_declaration_list
+        // The actual declaration is inside static_final_declaration child
+        for (const sub of child.children) {
+          if (sub.type === "static_final_declaration") {
+            processTopLevelVariable(sub, filePath, lines, imports, chunks, commentStartLine);
+          }
+        }
         break;
       default:
         break;

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { execFileSync, execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -15,7 +15,7 @@ try {
   process.stderr.write(
     `[scrooge] Native modules don't match Node ${process.version}, rebuilding...\n`
   );
-  execSync("npm rebuild better-sqlite3 tree-sitter --loglevel=error", {
+  execFileSync("npm", ["rebuild", "better-sqlite3", "tree-sitter", "--loglevel=error"], {
     cwd: root,
     stdio: ["pipe", "pipe", "inherit"],
   });

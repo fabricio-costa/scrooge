@@ -165,7 +165,7 @@ Test fixtures are located in `test/fixtures/` (Kotlin, TypeScript, Dart, XML, Gr
 
 ## Key Conventions
 
-- All code, comments, and commits in English
+- All communication in English — code, comments, commits, and conversation responses
 - TypeScript strict mode, ESM modules
 - Tests with vitest in `test/`
 - Conventional commits (`feat:`, `fix:`, `refactor:`, `test:`, etc.)

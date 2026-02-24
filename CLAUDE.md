@@ -174,6 +174,6 @@ Test fixtures are located in `test/fixtures/` (Kotlin, TypeScript, Dart, XML, Gr
 
 - `@modelcontextprotocol/sdk` -- MCP protocol
 - `better-sqlite3` + `sqlite-vec` -- Storage with vector search
-- `tree-sitter` + `tree-sitter-kotlin` + `tree-sitter-typescript` -- AST parsing (Kotlin, TypeScript)
+- `tree-sitter` + `tree-sitter-kotlin` + `tree-sitter-typescript` + `tree-sitter-dart` -- AST parsing (Kotlin, TypeScript, Dart)
 - `@xenova/transformers` -- Local embeddings (all-MiniLM-L6-v2)
 - `zod` -- Schema validation

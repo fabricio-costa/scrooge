@@ -435,7 +435,7 @@ rm ~/.scrooge/scrooge.db
 
 ### Test fixtures
 
-Test fixtures in `test/fixtures/` include Kotlin source files, TypeScript/TSX modules, Android XML layouts, and Gradle build scripts — covering the primary file types Scrooge indexes.
+Test fixtures in `test/fixtures/` include Kotlin source files, TypeScript/TSX modules, Dart/Flutter files, Android XML layouts, and Gradle build scripts — covering the primary file types Scrooge indexes.
 
 ### Conventions
 

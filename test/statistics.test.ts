@@ -224,4 +224,79 @@ describe("buildStatisticsReport", () => {
     const report = buildStatisticsReport(db, "/home/user/projects/kotlin-pdv", "all");
     expect(report).toContain("kotlin-pdv");
   });
+
+  it("should show per-tool savings breakdown", () => {
+    insertCalls([
+      { tool: "search", repo_path: "/test/repo", duration_ms: 100, tokens_sent: 500, tokens_raw: 3000 },
+      { tool: "search", repo_path: "/test/repo", duration_ms: 120, tokens_sent: 300, tokens_raw: 2000 },
+      { tool: "lookup", repo_path: "/test/repo", duration_ms: 80, tokens_sent: 200, tokens_raw: 1000 },
+      { tool: "map", repo_path: "/test/repo", duration_ms: 50, tokens_sent: 100, tokens_raw: 500 },
+      { tool: "status", repo_path: "/test/repo", duration_ms: 10, tokens_sent: 0, tokens_raw: 0 },
+    ]);
+
+    const report = buildStatisticsReport(db, "/test/repo", "all");
+
+    expect(report).toContain("Savings by Tool");
+    // search: 800 delivered / 5,000 raw (84.0% saved)
+    expect(report).toContain("search: 800 delivered / 5,000 raw (84.0% saved)");
+    // lookup: 200 delivered / 1,000 raw (80.0% saved)
+    expect(report).toContain("lookup: 200 delivered / 1,000 raw (80.0% saved)");
+    // map: 100 delivered / 500 raw (80.0% saved)
+    expect(report).toContain("map: 100 delivered / 500 raw (80.0% saved)");
+    // status has 0 tokens_raw, should not appear in savings breakdown
+    expect(report).not.toContain("status: 0 delivered");
+  });
+
+  it("should show model breakdown when model data exists", () => {
+    insertCalls([
+      { tool: "search", repo_path: "/test/repo", duration_ms: 100, tokens_sent: 500, tokens_raw: 3000, model: "claude-opus-4-6" },
+      { tool: "search", repo_path: "/test/repo", duration_ms: 120, tokens_sent: 300, tokens_raw: 2000, model: "claude-opus-4-6" },
+      { tool: "lookup", repo_path: "/test/repo", duration_ms: 80, tokens_sent: 200, tokens_raw: 1000, model: "claude-sonnet-4-5" },
+    ]);
+
+    const report = buildStatisticsReport(db, "/test/repo", "all");
+
+    expect(report).toContain("Models");
+    expect(report).toContain("claude-opus-4-6: 2 calls (800 tokens)");
+    expect(report).toContain("claude-sonnet-4-5: 1 calls (200 tokens)");
+  });
+
+  it("should hide model section when all models are unknown", () => {
+    insertCalls([
+      { tool: "search", repo_path: "/test/repo", duration_ms: 100, tokens_sent: 500, tokens_raw: 3000 },
+    ]);
+
+    const report = buildStatisticsReport(db, "/test/repo", "all");
+
+    expect(report).not.toContain("Models");
+  });
+});
+
+describe("recordToolCall with model", () => {
+  it("should store model field", () => {
+    recordToolCall(db, {
+      tool: "search",
+      repo_path: "/test/repo",
+      duration_ms: 100,
+      tokens_sent: 500,
+      tokens_raw: 3000,
+      model: "claude-opus-4-6",
+    });
+
+    const row = db.prepare("SELECT model FROM tool_calls WHERE tool = 'search'").get() as { model: string | null };
+    expect(row.model).toBe("claude-opus-4-6");
+  });
+
+  it("should store null when model not provided", () => {
+    recordToolCall(db, {
+      tool: "status",
+      repo_path: "/test/repo",
+      duration_ms: 10,
+      tokens_sent: 0,
+      tokens_raw: 0,
+    });
+
+    const row = db.prepare("SELECT model FROM tool_calls WHERE tool = 'status'").get() as { model: string | null };
+    expect(row.model).toBeNull();
+  });
 });

@@ -8,6 +8,7 @@ import { gradleChunker } from "./chunkers/gradle.js";
 import { genericChunker } from "./chunkers/generic.js";
 import { typescriptChunker } from "./chunkers/typescript.js";
 import { dartChunker } from "./chunkers/dart.js";
+import { pythonChunker } from "./chunkers/python.js";
 import type { ChunkerPlugin } from "./chunkers/types.js";
 import { embed } from "./embedder.js";
 import {
@@ -26,6 +27,7 @@ const chunkers: ChunkerPlugin[] = [
   kotlinChunker,
   typescriptChunker,
   dartChunker,
+  pythonChunker,
   xmlAndroidChunker,
   gradleChunker,
   genericChunker, // must be last (fallback)

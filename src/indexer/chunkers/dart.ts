@@ -475,24 +475,24 @@ function extractImports(root: Parser.SyntaxNode): string[] {
   const imports: string[] = [];
   for (const child of root.children) {
     if (child.type === "import_or_export") {
-      // Find the string literal with the package path
-      for (const sub of child.children) {
-        if (sub.type === "library_import" || sub.type === "library_export") {
-          for (const part of sub.children) {
-            if (part.type === "configurable_uri") {
-              const str = findChildByType(part, "string_literal")
-                ?? findChildByType(part, "uri");
-              if (str) {
-                const path = str.text.replace(/['"]/g, "");
-                if (path) imports.push(path);
-              }
-            }
-          }
-        }
-      }
+      // Walk recursively to find configurable_uri → uri → string_literal
+      const uriText = findImportUri(child);
+      if (uriText) imports.push(uriText);
     }
   }
   return imports;
+}
+
+function findImportUri(node: Parser.SyntaxNode): string | null {
+  // Look for string_literal inside configurable_uri (may be nested under import_specification)
+  if (node.type === "string_literal") {
+    return node.text.replace(/['"]/g, "");
+  }
+  for (const child of node.children) {
+    const result = findImportUri(child);
+    if (result) return result;
+  }
+  return null;
 }
 
 function extractAnnotations(node: Parser.SyntaxNode): string[] {

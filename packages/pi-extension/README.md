@@ -5,12 +5,15 @@ Scrooge code intelligence tools for [pi.dev](https://pi.dev) — hybrid RAG sear
 ## Installation
 
 ```bash
-# From npm:
-pi install npm:@fabricio-costa/pi-scrooge
+# Build scrooge first (generates dist/api/ that the extension imports):
+cd /path/to/scrooge
+npm install && npm run build
 
-# Local development:
+# Install the extension (pi.dev loads TypeScript via jiti — no build needed):
 pi install /path/to/scrooge/packages/pi-extension
 ```
+
+Pi.dev auto-discovers extensions from `~/.pi/agent/extensions/` and project-local `.pi/extensions/`. Hot-reload with `/reload`.
 
 ## Prerequisites
 

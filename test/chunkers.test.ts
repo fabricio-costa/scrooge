@@ -6,6 +6,7 @@ import { typescriptChunker } from "../src/indexer/chunkers/typescript.js";
 import { xmlAndroidChunker } from "../src/indexer/chunkers/xml-android.js";
 import { gradleChunker } from "../src/indexer/chunkers/gradle.js";
 import { genericChunker } from "../src/indexer/chunkers/generic.js";
+import { dartChunker } from "../src/indexer/chunkers/dart.js";
 
 const FIXTURES = join(import.meta.dirname!, "..", "test", "fixtures");
 

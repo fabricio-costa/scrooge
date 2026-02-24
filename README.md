@@ -273,8 +273,8 @@ src/
 │   └── tools/            # One file per tool (search, map, lookup, reindex, status, statistics)
 ├── indexer/
 │   ├── pipeline.ts       # Orchestrates: classify → chunk → sketch → embed → store
-│   ├── classifier.ts     # File type detection (Kotlin, TypeScript, XML, Gradle, generic)
-│   ├── chunkers/         # Language-specific chunkers (tree-sitter for Kotlin/TypeScript, regex for others)
+│   ├── classifier.ts     # File type detection (Kotlin, TypeScript, Dart, XML, Gradle, generic)
+│   ├── chunkers/         # Language-specific chunkers (tree-sitter for Kotlin/TypeScript/Dart, regex for others)
 │   └── sketcher.ts       # Compresses chunks into token-efficient sketches
 ├── retrieval/
 │   ├── hybrid.ts         # Orchestrates lexical + vector search with RRF fusion

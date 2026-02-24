@@ -452,7 +452,7 @@ Test fixtures in `test/fixtures/` include Kotlin source files, TypeScript/TSX mo
 ### Conventions
 
 - TypeScript strict mode, ESM modules
-- All code, comments, and commits in English
+- All communication in English — code, comments, commits, and conversation responses
 - Conventional commits: `feat:`, `fix:`, `refactor:`, `test:`, `docs:`
 - Tests with vitest in `test/`
 

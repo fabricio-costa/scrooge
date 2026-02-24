@@ -7,6 +7,7 @@ import { xmlAndroidChunker } from "../src/indexer/chunkers/xml-android.js";
 import { gradleChunker } from "../src/indexer/chunkers/gradle.js";
 import { genericChunker } from "../src/indexer/chunkers/generic.js";
 import { dartChunker } from "../src/indexer/chunkers/dart.js";
+import { pythonChunker } from "../src/indexer/chunkers/python.js";
 
 const FIXTURES = join(import.meta.dirname!, "..", "test", "fixtures");
 
@@ -483,5 +484,128 @@ describe("dart chunker", () => {
     const userChunk = chunks.find((c) => c.symbolName === "User");
     expect(userChunk).toBeDefined();
     expect(userChunk!.tags).toContain("freezed");
+  });
+});
+
+describe("python chunker", () => {
+  it("should support python files", () => {
+    expect(pythonChunker.supports("main.py", "python")).toBe(true);
+    expect(pythonChunker.supports("main.kt", "kotlin")).toBe(false);
+  });
+
+  it("should chunk @dataclass as dataclass kind", () => {
+    const content = fixture("calculator.py");
+    const chunks = pythonChunker.chunk("calculator.py", content);
+
+    const configChunk = chunks.find((c) => c.symbolName === "CalculatorConfig");
+    expect(configChunk).toBeDefined();
+    expect(configChunk!.kind).toBe("dataclass");
+    expect(configChunk!.tags).toContain("dataclass");
+  });
+
+  it("should chunk regular class", () => {
+    const content = fixture("calculator.py");
+    const chunks = pythonChunker.chunk("calculator.py", content);
+
+    const calcChunk = chunks.find((c) => c.symbolName === "Calculator");
+    expect(calcChunk).toBeDefined();
+    expect(calcChunk!.kind).toBe("class");
+  });
+
+  it("should chunk abstract class", () => {
+    const content = fixture("calculator.py");
+    const chunks = pythonChunker.chunk("calculator.py", content);
+
+    const baseChunk = chunks.find((c) => c.symbolName === "BaseCalculator");
+    expect(baseChunk).toBeDefined();
+    expect(baseChunk!.kind).toBe("class");
+    expect(baseChunk!.tags).toContain("abc");
+  });
+
+  it("should extract class signature with inheritance", () => {
+    const content = fixture("calculator.py");
+    const chunks = pythonChunker.chunk("calculator.py", content);
+
+    const calcChunk = chunks.find((c) => c.symbolName === "Calculator");
+    expect(calcChunk).toBeDefined();
+    expect(calcChunk!.signature).toContain("class Calculator(BaseCalculator):");
+  });
+
+  it("should chunk top-level functions", () => {
+    const content = fixture("calculator.py");
+    const chunks = pythonChunker.chunk("calculator.py", content);
+
+    const addChunk = chunks.find((c) => c.symbolName === "add");
+    expect(addChunk).toBeDefined();
+    expect(addChunk!.kind).toBe("function");
+
+    const fetchChunk = chunks.find((c) => c.symbolName === "fetch_constants");
+    expect(fetchChunk).toBeDefined();
+    expect(fetchChunk!.kind).toBe("function");
+  });
+
+  it("should detect async tag", () => {
+    const content = fixture("calculator.py");
+    const chunks = pythonChunker.chunk("calculator.py", content);
+
+    const fetchChunk = chunks.find((c) => c.symbolName === "fetch_constants");
+    expect(fetchChunk).toBeDefined();
+    expect(fetchChunk!.tags).toContain("async");
+  });
+
+  it("should extract docstrings into sketch", () => {
+    const content = fixture("calculator.py");
+    const chunks = pythonChunker.chunk("calculator.py", content);
+
+    const calcChunk = chunks.find((c) => c.symbolName === "Calculator");
+    expect(calcChunk).toBeDefined();
+    expect(calcChunk!.textSketch).toContain("Full calculator implementation");
+  });
+
+  it("should use file path for fqname", () => {
+    const content = fixture("calculator.py");
+    const chunks = pythonChunker.chunk("src/calculator.py", content);
+
+    const calcChunk = chunks.find((c) => c.symbolName === "Calculator");
+    expect(calcChunk).toBeDefined();
+    expect(calcChunk!.symbolFqname).toBe("src/calculator.py.Calculator");
+  });
+
+  it("should extract imports into uses", () => {
+    const content = fixture("calculator.py");
+    const chunks = pythonChunker.chunk("calculator.py", content);
+
+    // The dataclass chunk text should reference dataclasses
+    const configChunk = chunks.find((c) => c.symbolName === "CalculatorConfig");
+    expect(configChunk).toBeDefined();
+    expect(configChunk!.uses.length).toBeGreaterThan(0);
+  });
+
+  it("should have valid chunk IDs", () => {
+    const content = fixture("calculator.py");
+    const chunks = pythonChunker.chunk("calculator.py", content);
+
+    for (const chunk of chunks) {
+      expect(chunk.id).toMatch(/^[a-f0-9]{24}$/);
+      expect(chunk.contentHash).toMatch(/^[a-f0-9]{16}$/);
+    }
+  });
+
+  it("should extract Python properties in skeleton", () => {
+    const content = fixture("calculator.py");
+    const chunks = pythonChunker.chunk("calculator.py", content);
+
+    const baseChunk = chunks.find((c) => c.symbolName === "BaseCalculator");
+    expect(baseChunk).toBeDefined();
+    expect(baseChunk!.textSketch).toContain("self.config");
+  });
+
+  it("should chunk Exception subclass", () => {
+    const content = fixture("calculator.py");
+    const chunks = pythonChunker.chunk("calculator.py", content);
+
+    const errorChunk = chunks.find((c) => c.symbolName === "MathError");
+    expect(errorChunk).toBeDefined();
+    expect(errorChunk!.kind).toBe("class");
   });
 });

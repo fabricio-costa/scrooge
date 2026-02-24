@@ -140,6 +140,16 @@ function extractClassSkeleton(text: string): string {
       const sig = trimmed.replace(/\{[\s\S]*$/, "").trim();
       skeleton.push("  " + sig);
     }
+    // Dart field declarations: "final String name;", "late int count;", "String? email;"
+    if (/^\s*(final|late|static|const)\s+\w+[\w<>,?\s]*\s+\w+\s*[;=]/.test(line)) {
+      skeleton.push("  " + trimmed);
+    }
+    // Dart method signatures (exclude control flow keywords)
+    if (/^\s*(@\w+\s+)*(static\s+)?(Future|void|String|int|bool|double|List|Map|Set|Stream|dynamic|\w+)[<\w>,?\s]*\s+\w+\s*\(/.test(line)
+        && !trimmed.startsWith("if") && !trimmed.startsWith("for") && !trimmed.startsWith("while") && !trimmed.startsWith("return")) {
+      const sig = trimmed.replace(/\{[\s\S]*$/, "").replace(/=>[\s\S]*$/, "").trim();
+      skeleton.push("  " + sig);
+    }
   }
 
   return skeleton.join("\n");

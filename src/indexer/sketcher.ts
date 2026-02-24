@@ -34,6 +34,7 @@ export function generateSketch(chunk: Chunk): string {
     case "class":
     case "object":
     case "viewmodel":
+    case "dataclass":
       parts.push(extractClassSkeleton(textRaw));
       break;
     case "function":
@@ -101,6 +102,10 @@ function extractDocComment(text: string): string {
   const match = text.match(/\/\*\*[\s\S]*?\*\//);
   if (match) return match[0];
 
+  // Python triple-quoted docstrings
+  const pyDocMatch = text.match(/^\s*(?:"""[\s\S]*?"""|'''[\s\S]*?''')/m);
+  if (pyDocMatch) return pyDocMatch[0].trim();
+
   // Single-line doc comments
   const lines = text.split("\n");
   const docLines: string[] = [];
@@ -150,6 +155,15 @@ function extractClassSkeleton(text: string): string {
       const sig = trimmed.replace(/\{[\s\S]*$/, "").replace(/=>[\s\S]*$/, "").trim();
       skeleton.push("  " + sig);
     }
+    // Python self.x = ... assignments (instance attributes)
+    if (/^\s*self\.\w+\s*=/.test(line)) {
+      skeleton.push("  " + trimmed);
+    }
+    // Python method definitions
+    if (/^\s*(async\s+)?def\s+\w+/.test(line)) {
+      const sig = trimmed.replace(/:[\s\S]*$/, ":").trim();
+      skeleton.push("  " + sig);
+    }
   }
 
   return skeleton.join("\n");
@@ -160,6 +174,10 @@ function extractFunctionSignature(text: string): string {
   for (const line of lines) {
     if (/\bfun\s+/.test(line)) {
       return line.trim().replace(/\{[\s\S]*$/, "").trim();
+    }
+    // Python def
+    if (/\bdef\s+/.test(line)) {
+      return line.trim().replace(/:[\s\S]*$/, ":").trim();
     }
   }
   return lines[0]?.trim() ?? "";

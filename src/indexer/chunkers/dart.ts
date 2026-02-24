@@ -1,6 +1,6 @@
 import Parser from "tree-sitter";
 import DartLanguage from "tree-sitter-dart";
-import type { Chunk, ChunkKind, ChunkerPlugin } from "./types.js";
+import type { Chunk, ChunkerPlugin } from "./types.js";
 import { hashContent, chunkId } from "./utils.js";
 import { generateSketch } from "../sketcher.js";
 

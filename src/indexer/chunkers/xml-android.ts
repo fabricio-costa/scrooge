@@ -3,6 +3,8 @@ import type { Chunk, ChunkKind, ChunkerPlugin } from "./types.js";
 import { hashContent, chunkId } from "./utils.js";
 import { truncateToTokenBudget } from "../../utils/tokens.js";
 
+const MAX_XML_REGEX_SIZE = 500_000; // 500KB — above this, fall back to simple chunking
+
 export const xmlAndroidChunker: ChunkerPlugin = {
   id: "xml-android",
 
@@ -11,6 +13,11 @@ export const xmlAndroidChunker: ChunkerPlugin = {
   },
 
   chunk(filePath: string, content: string): Chunk[] {
+    // Guard against ReDoS on very large XML files
+    if (content.length > MAX_XML_REGEX_SIZE) {
+      return [makeFileChunk(filePath, content, "layout")];
+    }
+
     const fileName = basename(filePath).toLowerCase();
 
     if (fileName === "androidmanifest.xml") {

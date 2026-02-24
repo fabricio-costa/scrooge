@@ -1,5 +1,5 @@
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { readFileSync, lstatSync, statSync } from "node:fs";
+import { join, basename } from "node:path";
 import type Database from "better-sqlite3";
 import { classifyFile } from "./classifier.js";
 import { kotlinChunker } from "./chunkers/kotlin.js";
@@ -31,6 +31,8 @@ const chunkers: ChunkerPlugin[] = [
   genericChunker, // must be last (fallback)
 ];
 
+const MAX_FILE_SIZE = 1_000_000; // 1MB
+
 export interface IndexStats {
   filesProcessed: number;
   chunksCreated: number;
@@ -57,7 +59,7 @@ export async function runPipeline(options: IndexOptions): Promise<IndexStats> {
   const { repoPath, db, incremental, withEmbeddings } = options;
   const start = Date.now();
 
-  log(`Starting ${incremental ? "incremental" : "full"} index of ${repoPath}`);
+  log(`Starting ${incremental ? "incremental" : "full"} index of ${basename(repoPath)}`);
 
   const commitSha = getHeadCommit(repoPath);
   let filesToProcess: string[];
@@ -112,9 +114,29 @@ export async function runPipeline(options: IndexOptions): Promise<IndexStats> {
 
   for (const file of filesToProcess) {
     try {
+      const fullPath = join(repoPath, file);
+
+      // Skip symlinks to prevent traversal
+      try {
+        if (lstatSync(fullPath).isSymbolicLink()) continue;
+      } catch {
+        continue;
+      }
+
+      // Skip files exceeding size limit
+      try {
+        const stat = statSync(fullPath);
+        if (stat.size > MAX_FILE_SIZE) {
+          log(`Skipping ${file}: exceeds 1MB`);
+          continue;
+        }
+      } catch {
+        continue;
+      }
+
       let content: string;
       try {
-        content = readFileSync(join(repoPath, file), "utf-8");
+        content = readFileSync(fullPath, "utf-8");
       } catch {
         continue; // File might have been deleted
       }
@@ -165,7 +187,8 @@ export async function runPipeline(options: IndexOptions): Promise<IndexStats> {
       }
     } catch (err) {
       errors++;
-      log(`Error processing ${file}: ${err instanceof Error ? err.message : err}`);
+      const msg = err instanceof Error ? err.message : String(err);
+      log(`Error processing ${file}: ${msg}`);
       continue;
     }
 

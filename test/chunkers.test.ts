@@ -375,3 +375,107 @@ describe("generic chunker", () => {
     expect(chunks.length).toBeGreaterThan(1);
   });
 });
+
+describe("dart chunker", () => {
+  it("should support dart files", () => {
+    expect(dartChunker.supports("main.dart", "dart")).toBe(true);
+    expect(dartChunker.supports("main.ts", "typescript")).toBe(false);
+  });
+
+  it("should chunk StatelessWidget class with flutter/widget tags", () => {
+    const content = fixture("home_screen.dart");
+    const chunks = dartChunker.chunk("lib/ui/home_screen.dart", content);
+
+    const classChunk = chunks.find((c) => c.kind === "class");
+    expect(classChunk).toBeDefined();
+    expect(classChunk!.symbolName).toBe("HomeScreen");
+    expect(classChunk!.language).toBe("dart");
+    expect(classChunk!.tags).toContain("flutter");
+    expect(classChunk!.tags).toContain("widget");
+    expect(classChunk!.defines).toContain("lib/ui/home_screen.dart.HomeScreen");
+  });
+
+  it("should chunk enum with members in sketch", () => {
+    const content = fixture("models.dart");
+    const chunks = dartChunker.chunk("lib/models.dart", content);
+
+    const enumChunk = chunks.find((c) => c.kind === "enum");
+    expect(enumChunk).toBeDefined();
+    expect(enumChunk!.symbolName).toBe("UserRole");
+    expect(enumChunk!.textSketch).toContain("admin");
+  });
+
+  it("should chunk mixin", () => {
+    const content = fixture("models.dart");
+    const chunks = dartChunker.chunk("lib/models.dart", content);
+
+    const mixinChunk = chunks.find((c) => c.kind === "mixin");
+    expect(mixinChunk).toBeDefined();
+    expect(mixinChunk!.symbolName).toBe("Validatable");
+  });
+
+  it("should chunk typedef", () => {
+    const content = fixture("models.dart");
+    const chunks = dartChunker.chunk("lib/models.dart", content);
+
+    const typeAliasChunk = chunks.find((c) => c.kind === "type_alias");
+    expect(typeAliasChunk).toBeDefined();
+    expect(typeAliasChunk!.symbolName).toBe("UserMap");
+  });
+
+  it("should chunk extension", () => {
+    const content = fixture("models.dart");
+    const chunks = dartChunker.chunk("lib/models.dart", content);
+
+    const extensionChunk = chunks.find((c) => c.kind === "extension");
+    expect(extensionChunk).toBeDefined();
+    expect(extensionChunk!.symbolName).toBe("StringFormatting");
+  });
+
+  it("should chunk abstract class with async methods", () => {
+    const content = fixture("user_repository.dart");
+    const chunks = dartChunker.chunk("lib/data/user_repository.dart", content);
+
+    const abstractChunk = chunks.find((c) => c.symbolName === "Repository");
+    expect(abstractChunk).toBeDefined();
+    expect(abstractChunk!.kind).toBe("class");
+    expect(abstractChunk!.tags).toContain("async");
+  });
+
+  it("should extract imports into uses", () => {
+    const content = fixture("user_repository.dart");
+    const chunks = dartChunker.chunk("lib/data/user_repository.dart", content);
+
+    const repoChunk = chunks.find((c) => c.symbolName === "UserRepository");
+    expect(repoChunk).toBeDefined();
+    expect(repoChunk!.uses.length).toBeGreaterThan(0);
+  });
+
+  it("should have valid chunk IDs", () => {
+    const content = fixture("home_screen.dart");
+    const chunks = dartChunker.chunk("lib/ui/home_screen.dart", content);
+
+    for (const chunk of chunks) {
+      expect(chunk.id).toMatch(/^[a-f0-9]{24}$/);
+      expect(chunk.contentHash).toMatch(/^[a-f0-9]{16}$/);
+    }
+  });
+
+  it("should include doc comment in chunk text", () => {
+    const content = fixture("home_screen.dart");
+    const chunks = dartChunker.chunk("lib/ui/home_screen.dart", content);
+
+    const classChunk = chunks.find((c) => c.kind === "class");
+    expect(classChunk).toBeDefined();
+    expect(classChunk!.textRaw).toContain("/// A simple home screen widget");
+  });
+
+  it("should detect freezed tag from annotation", () => {
+    const content = fixture("models.dart");
+    const chunks = dartChunker.chunk("lib/models.dart", content);
+
+    const userChunk = chunks.find((c) => c.symbolName === "User");
+    expect(userChunk).toBeDefined();
+    expect(userChunk!.tags).toContain("freezed");
+  });
+});

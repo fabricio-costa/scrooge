@@ -76,14 +76,22 @@ function visitNode(
 
 function getPrecedingCommentStart(parent: Parser.SyntaxNode, index: number): number | undefined {
   if (index <= 0) return undefined;
-  const prev = parent.children[index - 1];
-  // Dart doc comments: /** ... */ or /// lines (documentation_comment node)
-  if (prev.type === "documentation_comment" || prev.type === "comment") {
-    if (prev.text.startsWith("/**") || prev.text.startsWith("///")) {
-      return prev.startPosition.row;
+  // Dart /// doc comments are separate documentation_comment nodes per line.
+  // Walk backwards to find the earliest consecutive doc comment.
+  let earliest: number | undefined;
+  for (let j = index - 1; j >= 0; j--) {
+    const sibling = parent.children[j];
+    if (sibling.type === "documentation_comment" || sibling.type === "comment") {
+      if (sibling.text.startsWith("/**") || sibling.text.startsWith("///")) {
+        earliest = sibling.startPosition.row;
+      } else {
+        break;
+      }
+    } else {
+      break;
     }
   }
-  return undefined;
+  return earliest;
 }
 
 function processClass(

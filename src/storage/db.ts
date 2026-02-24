@@ -2,7 +2,7 @@ import { chmodSync } from "node:fs";
 import Database from "better-sqlite3";
 import * as sqliteVec from "sqlite-vec";
 
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 
 const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS chunks (
@@ -136,6 +136,10 @@ export function runMigrations(db: Database.Database): void {
         }
       }
     })();
+  }
+
+  if (currentVersion < 3) {
+    db.exec("ALTER TABLE tool_calls ADD COLUMN channel TEXT DEFAULT 'mcp'");
   }
 
   db.pragma(`user_version = ${SCHEMA_VERSION}`);
@@ -292,19 +296,21 @@ export interface ToolCallRecord {
   duration_ms: number;
   tokens_sent: number;
   tokens_raw: number;
+  channel?: string;
   metadata?: Record<string, unknown>;
 }
 
 export function recordToolCall(db: Database.Database, data: ToolCallRecord): void {
   db.prepare(`
-    INSERT INTO tool_calls (tool, repo_path, duration_ms, tokens_sent, tokens_raw, metadata)
-    VALUES (@tool, @repo_path, @duration_ms, @tokens_sent, @tokens_raw, @metadata)
+    INSERT INTO tool_calls (tool, repo_path, duration_ms, tokens_sent, tokens_raw, channel, metadata)
+    VALUES (@tool, @repo_path, @duration_ms, @tokens_sent, @tokens_raw, @channel, @metadata)
   `).run({
     tool: data.tool,
     repo_path: data.repo_path,
     duration_ms: data.duration_ms,
     tokens_sent: data.tokens_sent,
     tokens_raw: data.tokens_raw,
+    channel: data.channel ?? "mcp",
     metadata: data.metadata ? JSON.stringify(data.metadata) : null,
   });
 }

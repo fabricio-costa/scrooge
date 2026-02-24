@@ -1,5 +1,9 @@
-import { pipeline, type FeatureExtractionPipeline } from "@xenova/transformers";
+import { pipeline, env, type FeatureExtractionPipeline } from "@xenova/transformers";
 import { getConfig } from "../utils/config.js";
+
+// Block remote model downloads — use vendored model only
+env.allowRemoteModels = false;
+env.localModelPath = getConfig().modelPath;
 
 let _embedder: FeatureExtractionPipeline | null = null;
 

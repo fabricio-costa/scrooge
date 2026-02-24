@@ -337,7 +337,7 @@ Each sketch is capped at 200 tokens (configurable via `sketchMaxTokens`). Longer
 
 ### Embeddings
 
-Scrooge uses [all-MiniLM-L6-v2](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2) via `@xenova/transformers` for local embedding generation — no external API calls, no network dependency.
+Scrooge uses [all-MiniLM-L6-v2](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2) via `@xenova/transformers` for local embedding generation — no external API calls, no network dependency. The model is vendored in `models/` and remote downloads are blocked at runtime, eliminating supply-chain risk from HuggingFace Hub.
 
 | Property | Value |
 |----------|-------|
@@ -346,7 +346,7 @@ Scrooge uses [all-MiniLM-L6-v2](https://huggingface.co/sentence-transformers/all
 | Pooling | Mean pooling over all output tokens |
 | Normalization | L2-normalized (unit vectors), enabling cosine similarity via dot product |
 | Runtime | In-process via ONNX Runtime (Node.js) |
-| First load | ~2-3s (model cached on disk after first download) |
+| Storage | Vendored in `models/` (~23MB, committed to git) |
 
 During indexing, Scrooge embeds each chunk's **sketch** (not the raw source). This is intentional — the sketch contains the semantic essence (signatures, names, structure) without implementation noise, producing higher-quality embeddings for code search.
 
@@ -416,6 +416,7 @@ All settings have sensible defaults. Override via `getConfig()` in code:
 | `rrfK` | `60` | RRF fusion constant (higher = more weight to lower ranks) |
 | `embeddingModel` | `Xenova/all-MiniLM-L6-v2` | Local embedding model |
 | `embeddingDims` | `384` | Embedding vector dimensions |
+| `modelPath` | `<project>/models` | Path to vendored ONNX model files |
 
 ## Database
 

@@ -10,6 +10,7 @@ export interface ScroogeConfig {
   rrfK: number;
   embeddingModel: string;
   embeddingDims: number;
+  modelPath: string;
 }
 
 const DEFAULT_CONFIG: ScroogeConfig = {
@@ -21,6 +22,7 @@ const DEFAULT_CONFIG: ScroogeConfig = {
   rrfK: 60,
   embeddingModel: "Xenova/all-MiniLM-L6-v2",
   embeddingDims: 384,
+  modelPath: join(import.meta.dirname ?? __dirname, "..", "..", "models"),
 };
 
 let _config: ScroogeConfig | null = null;

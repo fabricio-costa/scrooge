@@ -136,7 +136,9 @@ Sources: lexical 30% | vector 25% | both 45%
 
 ## Architecture
 
-- **MCP Server** (`src/server/`): Stdio transport, 6 tools (search, map, lookup, reindex, status, statistics)
+- **API Layer** (`src/api/`): Transport-agnostic business logic shared by MCP and pi.dev — each function orchestrates openDb → ensureFresh → core → telemetry → close
+- **MCP Server** (`src/server/`): Thin adapters — Zod schema, param mapping, calls `src/api/*` with `channel: "mcp"`, wraps result in MCP format
+- **pi.dev Extension** (`packages/pi-extension/`): TypeBox schemas, calls `src/api/*` with `channel: "pi"`, registers tools via `pi.registerTool()`
 - **Indexer** (`src/indexer/`): Pipeline that classifies files, chunks them semantically (tree-sitter for Kotlin, TypeScript, and Dart), generates sketches, and computes embeddings
 - **Retrieval** (`src/retrieval/`): Hybrid search (FTS5 lexical + sqlite-vec vector) with RRF fusion and token-budgeted packaging
 - **Repo Map** (`src/repomap/`): Directory tree and hierarchical summaries from indexed data
@@ -177,4 +179,5 @@ Test fixtures are located in `test/fixtures/` (Kotlin, TypeScript, Dart, XML, Gr
 - `better-sqlite3` + `sqlite-vec` -- Storage with vector search
 - `tree-sitter` + `tree-sitter-kotlin` + `tree-sitter-typescript` + `tree-sitter-dart` -- AST parsing (Kotlin, TypeScript, Dart)
 - `@xenova/transformers` -- Local embeddings (all-MiniLM-L6-v2)
-- `zod` -- Schema validation
+- `zod` -- Schema validation (MCP handlers)
+- `@sinclair/typebox` -- Schema validation (pi.dev extension, in `packages/pi-extension/`)

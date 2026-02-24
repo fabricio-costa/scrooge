@@ -1,6 +1,7 @@
 import type Database from "better-sqlite3";
 import type { ChunkRow } from "../storage/db.js";
 import type { SearchFilter, SearchResult } from "./types.js";
+import { escapeLike } from "../utils/sql.js";
 
 export type { SearchFilter, SearchResult };
 
@@ -39,8 +40,8 @@ export function lexicalSearch(
   }
   if (filters.tags && filters.tags.length > 0) {
     for (const tag of filters.tags) {
-      sql += " AND c.tags LIKE ?";
-      params.push(`%"${tag}"%`);
+      sql += ` AND c.tags LIKE ? ESCAPE '\\'`;
+      params.push(`%"${escapeLike(tag)}"%`);
     }
   }
 
@@ -59,28 +60,28 @@ export function lexicalSearch(
 
 /**
  * Tokenize a natural language query for FTS5 MATCH.
- * Splits CamelCase identifiers and creates an OR query.
+ * Sanitizes special characters, splits CamelCase identifiers, and creates a quoted OR query.
+ * Keeps original compound words alongside split sub-terms for proper FTS5 token matching.
  */
 function tokenizeQuery(query: string): string {
-  // Keep original query terms alongside CamelCase-split terms
   const terms = new Set<string>();
 
-  // Add original words
-  const originalWords = query.split(/\s+/).filter((w) => w.length >= 2);
-  for (const w of originalWords) {
+  // Add original words (cleaned of special chars, but not CamelCase-split)
+  const originalCleaned = query.replace(/[^a-zA-Z0-9\s]/g, " ");
+  for (const w of originalCleaned.split(/\s+/).filter((w) => w.length >= 2)) {
     terms.add(w.toLowerCase());
   }
 
   // Split camelCase/PascalCase and add sub-terms
-  const expanded = query.replace(/([a-z])([A-Z])/g, "$1 $2");
-  const cleaned = expanded.replace(/[^a-zA-Z0-9\s]/g, " ");
-  const subWords = cleaned.split(/\s+/).filter((w) => w.length >= 2);
-  for (const w of subWords) {
+  const expanded = query
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .replace(/[^a-zA-Z0-9\s]/g, " ");
+  for (const w of expanded.split(/\s+/).filter((w) => w.length >= 2)) {
     terms.add(w.toLowerCase());
   }
 
   if (terms.size === 0) return "";
 
-  // FTS5: use unquoted terms for prefix matching and OR for combining
-  return [...terms].join(" OR ");
+  // Double-quote each term to prevent FTS5 operator interpretation
+  return [...terms].map((t) => `"${t}"`).join(" OR ");
 }

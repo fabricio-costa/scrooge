@@ -4,22 +4,25 @@ import { openDb, recordToolCall, type ChunkRow } from "../../storage/db.js";
 import { getConfig } from "../../utils/config.js";
 import { estimateTokens } from "../../utils/tokens.js";
 import { ensureFreshIndex, formatReindexNote } from "../../utils/freshness.js";
+import { validateRepoPath } from "../../utils/path-validation.js";
+import { escapeLike } from "../../utils/sql.js";
 
 export function registerLookupTool(server: McpServer): void {
   server.tool(
     "scrooge_lookup",
     "Look up a symbol by name: find its definition and all usages across the codebase.",
     {
-      symbol: z.string().describe("Symbol name to look up (e.g., 'LoginViewModel', 'authenticate')"),
-      repo_path: z.string().optional().describe("Absolute path to the repository (defaults to cwd)"),
+      symbol: z.string().min(1).max(200).describe("Symbol name to look up (e.g., 'LoginViewModel', 'authenticate')"),
+      repo_path: z.string().max(500).optional().describe("Absolute path to the repository (defaults to cwd)"),
       include_usages: z.boolean().optional().describe("Include chunks that reference this symbol (default true)"),
     },
     async ({ symbol, repo_path, include_usages }) => {
       const startTime = Date.now();
-      const repoPath = repo_path ?? process.cwd();
+      const repoPath = validateRepoPath(repo_path ?? process.cwd());
       const config = getConfig();
       const db = openDb(config.dbPath);
-      const escapedSymbol = symbol.replace(/"/g, '""');
+      const escapedSymbolLike = escapeLike(symbol);
+      const escapedSymbolFts = symbol.replace(/"/g, '""');
 
       try {
         const freshness = await ensureFreshIndex(db, repoPath);
@@ -28,10 +31,10 @@ export function registerLookupTool(server: McpServer): void {
         const definitions = db
           .prepare(`
             SELECT * FROM chunks
-            WHERE repo_path = ? AND (symbol_name = ? OR symbol_fqname LIKE ?)
+            WHERE repo_path = ? AND (symbol_name = ? OR symbol_fqname LIKE ? ESCAPE '\\')
             ORDER BY kind, path
           `)
-          .all(repoPath, symbol, `%${symbol}`) as ChunkRow[];
+          .all(repoPath, symbol, `%${escapedSymbolLike}`) as ChunkRow[];
 
         const result: Record<string, unknown> = {
           symbol,
@@ -44,10 +47,10 @@ export function registerLookupTool(server: McpServer): void {
           const usages = db
             .prepare(`
               SELECT * FROM chunks
-              WHERE repo_path = ? AND uses LIKE ? AND symbol_name != ?
+              WHERE repo_path = ? AND uses LIKE ? ESCAPE '\\' AND symbol_name != ?
               ORDER BY path, start_line
             `)
-            .all(repoPath, `%"${escapedSymbol}"%`, symbol) as ChunkRow[];
+            .all(repoPath, `%"${escapedSymbolLike}"%`, symbol) as ChunkRow[];
 
           // Also find via FTS
           const ftsUsages = db
@@ -57,7 +60,7 @@ export function registerLookupTool(server: McpServer): void {
               WHERE chunks_fts MATCH ? AND c.repo_path = ? AND c.symbol_name != ?
               LIMIT 20
             `)
-            .all(`"${escapedSymbol}"`, repoPath, symbol) as ChunkRow[];
+            .all(`"${escapedSymbolFts}"`, repoPath, symbol) as ChunkRow[];
 
           // Merge and deduplicate
           const seenIds = new Set(usages.map((u) => u.id));

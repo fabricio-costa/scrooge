@@ -98,7 +98,7 @@
 ## Installation
 
 ```bash
-git clone <repo-url>
+git clone https://github.com/fabricio-costa/scrooge.git
 cd scrooge
 npm install
 npm run build

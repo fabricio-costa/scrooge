@@ -449,3 +449,75 @@ describe("gradle/xml chunk types", () => {
     expect(estimateTokens(sketch)).toBeLessThanOrEqual(205);
   });
 });
+
+// ── I. Dart mixin/extension sketches ────────────────────────────────────────
+
+describe("dart mixin/extension sketches", () => {
+  it("should extract method signatures from a mixin", () => {
+    const sketch = generateSketch(
+      makeChunk({
+        kind: "mixin",
+        language: "dart",
+        path: "lib/models.dart",
+        signature: "mixin Validatable",
+        textRaw: `mixin Validatable {
+  bool validate();
+
+  String? get validationError {
+    return validate() ? null : 'Validation failed';
+  }
+}`,
+      }),
+    );
+
+    expect(sketch).toContain("mixin Validatable");
+    expect(sketch).toContain("bool validate()");
+  });
+
+  it("should extract method signatures from an extension", () => {
+    const sketch = generateSketch(
+      makeChunk({
+        kind: "extension",
+        language: "dart",
+        path: "lib/models.dart",
+        signature: "extension StringFormatting on String",
+        textRaw: `extension StringFormatting on String {
+  String toTitleCase() {
+    if (isEmpty) return this;
+    return split(' ').map((word) => word[0].toUpperCase() + word.substring(1)).join(' ');
+  }
+
+  String get initials {
+    return split(' ').where((w) => w.isNotEmpty).map((w) => w[0].toUpperCase()).join();
+  }
+}`,
+      }),
+    );
+
+    expect(sketch).toContain("extension StringFormatting on String");
+    expect(sketch).toContain("String toTitleCase()");
+  });
+
+  it("should include /// doc comments in dart sketches", () => {
+    const sketch = generateSketch(
+      makeChunk({
+        kind: "class",
+        language: "dart",
+        path: "lib/models.dart",
+        signature: "class HomeScreen extends StatelessWidget",
+        textRaw: `/// A simple home screen widget.
+/// Displays a welcome message.
+class HomeScreen extends StatelessWidget {
+  final String title;
+
+  Widget build(BuildContext context) {
+    return Text(title);
+  }
+}`,
+      }),
+    );
+
+    expect(sketch).toContain("/// A simple home screen widget.");
+    expect(sketch).toContain("/// Displays a welcome message.");
+  });
+});

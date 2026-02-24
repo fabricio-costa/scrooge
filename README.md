@@ -173,7 +173,7 @@ Hybrid code search combining FTS5 lexical search and sqlite-vec vector search wi
 | `query` | string | yes | — | Natural language or code identifier |
 | `repo_path` | string | no | cwd | Absolute path to the repository |
 | `filters.module` | string | no | — | Gradle module (e.g. `":app"`) |
-| `filters.language` | string | no | — | Language: `kotlin`, `typescript`, `xml`, `gradle` |
+| `filters.language` | string | no | — | Language: `kotlin`, `typescript`, `dart`, `xml`, `gradle` |
 | `filters.kind` | string | no | — | Chunk kind: `class`, `function`, `composable`, etc. |
 | `filters.tags` | string[] | no | — | Tags: `["hilt", "compose"]` |
 | `view` | string | no | `"sketch"` | `"sketch"` (compressed) or `"raw"` (full source) |

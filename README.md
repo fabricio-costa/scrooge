@@ -454,6 +454,7 @@ Test fixtures in `test/fixtures/` include Kotlin source files, TypeScript/TSX mo
 | `tree-sitter` | ^0.21.1 | Incremental parsing framework (native) |
 | `tree-sitter-kotlin` | ^0.3.8 | Kotlin grammar for tree-sitter |
 | `tree-sitter-typescript` | ^0.23.2 | TypeScript/TSX grammar for tree-sitter |
+| `tree-sitter-dart` | github:UserNobody14#c1222f5 | Dart grammar for tree-sitter (ABI 14 compatible) |
 | `@xenova/transformers` | ^2.17.0 | Local ML embeddings (all-MiniLM-L6-v2) |
 | `zod` | ^3.24.0 | Runtime schema validation |
 | `typescript` | ^5.7.0 | Type system and compiler |

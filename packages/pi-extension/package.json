@@ -1,0 +1,19 @@
+{
+  "name": "@fabricio-costa/pi-scrooge",
+  "version": "0.1.0",
+  "description": "Scrooge code search tools for pi.dev — hybrid RAG and repo maps",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "postinstall": "cd ../.. && npm rebuild better-sqlite3 tree-sitter --loglevel=error || true"
+  },
+  "dependencies": {
+    "scrooge": "file:../../",
+    "@sinclair/typebox": "^0.34.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "license": "MIT"
+}

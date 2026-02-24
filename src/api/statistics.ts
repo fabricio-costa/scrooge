@@ -120,6 +120,14 @@ export function buildStatisticsReport(
     lines.push("");
   }
 
+  // Model breakdown (only show if model data exists)
+  const modelBreakdown = getModelBreakdown(db, repoPath, dateClause, params);
+  if (modelBreakdown) {
+    lines.push("### Models");
+    lines.push(modelBreakdown);
+    lines.push("");
+  }
+
   // Search insights (if any search calls)
   const searchInsights = getSearchInsights(db, repoPath, dateClause, params);
   if (searchInsights) {
@@ -225,6 +233,41 @@ function getSearchInsights(
     vectorPct: totalSources > 0 ? Math.round((vector / totalSources) * 100).toString() : "0",
     bothPct: totalSources > 0 ? Math.round((both / totalSources) * 100).toString() : "0",
   };
+}
+
+interface ModelAggregate {
+  model: string;
+  call_count: number;
+  total_sent: number;
+}
+
+function getModelBreakdown(
+  db: Database.Database,
+  repoPath: string,
+  dateClause: string,
+  baseParams: unknown[],
+): string | null {
+  try {
+    const models = db
+      .prepare(
+        `SELECT COALESCE(model, 'unknown') as model, COUNT(*) as call_count,
+                COALESCE(SUM(tokens_sent), 0) as total_sent
+         FROM tool_calls
+         WHERE repo_path = ? ${dateClause}
+         GROUP BY model
+         ORDER BY call_count DESC`,
+      )
+      .all(...baseParams) as ModelAggregate[];
+
+    // Don't show section if all calls have unknown model
+    if (models.length <= 1 && models[0]?.model === "unknown") return null;
+    return models
+      .map((m) => `${m.model}: ${m.call_count} calls (${m.total_sent.toLocaleString("en-US")} tokens)`)
+      .join("\n");
+  } catch {
+    // model column may not exist yet (pre-v4 schema)
+    return null;
+  }
 }
 
 interface ChannelAggregate {

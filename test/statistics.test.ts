@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { openDb, recordToolCall, type ToolCallRecord } from "../src/storage/db.js";
-import { buildStatisticsReport } from "../src/server/tools/statistics.js";
+import { buildStatisticsReport } from "../src/api/statistics.js";
 import type Database from "better-sqlite3";
 
 let db: Database.Database;

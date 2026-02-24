@@ -83,12 +83,13 @@ export async function map(
     const outputText = output.join("\n");
     const tokensSent = estimateTokens(outputText);
 
-    // Compute raw tokens: sum of text_raw for all chunks in scope
+    // Compute raw tokens: sum of text_sketch as baseline (what an agent would
+    // minimally need to read to get equivalent structural understanding)
     const moduleFilter = params.module ? "AND module = ?" : "";
     const queryParams: unknown[] = [repoPath];
     if (params.module) queryParams.push(params.module);
     const rawRow = db
-      .prepare(`SELECT COALESCE(SUM(LENGTH(text_raw)), 0) as total_len FROM chunks WHERE repo_path = ? ${moduleFilter}`)
+      .prepare(`SELECT COALESCE(SUM(LENGTH(text_sketch)), 0) as total_len FROM chunks WHERE repo_path = ? ${moduleFilter}`)
       .get(...queryParams) as { total_len: number };
     const tokensRaw = Math.ceil(rawRow.total_len / 4);
 

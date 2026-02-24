@@ -105,7 +105,11 @@ npm install
 npm run build
 ```
 
-## Registering with Claude Code
+## Registering with your Agent
+
+Scrooge supports multiple AI agents through a shared API layer. Both integrations use the same database (`~/.scrooge/scrooge.db`) and `scrooge_statistics` shows per-channel usage breakdowns.
+
+### Claude Code (MCP)
 
 Register at **user scope** so Scrooge is available from any project directory:
 
@@ -117,33 +121,23 @@ claude mcp add -s user scrooge -- node /absolute/path/to/scrooge/bin/scrooge-mcp
 claude mcp add scrooge -- npx tsx /absolute/path/to/scrooge/src/index.ts
 ```
 
-### Self-healing launcher
-
 The launcher script (`bin/scrooge-mcp.mjs`) automatically detects when native modules (`better-sqlite3`, `tree-sitter`) were compiled against a different Node.js version and rebuilds them before starting the server. This prevents the dreaded `NODE_MODULE_VERSION` mismatch error when switching Node versions between projects.
-
-## Integrations
-
-### Claude Code (MCP)
-
-See [Registering with Claude Code](#registering-with-claude-code) above. All 6 tools are available as MCP tools with `channel: "mcp"` telemetry.
 
 ### pi.dev (Extension)
 
-Scrooge is also available as a [pi.dev](https://pi.dev) extension, providing the same 6 tools inside pi sessions with `channel: "pi"` telemetry.
-
 ```bash
-# From npm:
-pi install npm:@fabricio-costa/pi-scrooge
+# Build scrooge first:
+npm run build
 
-# Local development:
+# Install the extension:
 pi install /path/to/scrooge/packages/pi-extension
 ```
 
-Both integrations share the same database (`~/.scrooge/scrooge.db`) and `scrooge_statistics` shows per-channel usage breakdowns.
+Pi.dev loads TypeScript extensions via jiti — no build step needed for the extension itself. Hot-reload with `/reload`.
 
 ## Quick Start
 
-Once registered, Scrooge tools are available in any Claude Code session. **No manual indexing required** — the index is created and maintained automatically.
+Once registered, Scrooge tools are available in your agent sessions. **No manual indexing required** — the index is created and maintained automatically.
 
 **1. Search the codebase**
 

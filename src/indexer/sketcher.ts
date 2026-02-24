@@ -48,6 +48,10 @@ export function generateSketch(chunk: Chunk): string {
     case "interface":
       parts.push(extractTsInterfaceMembers(textRaw));
       break;
+    case "mixin":
+    case "extension":
+      parts.push(extractClassSkeleton(textRaw));
+      break;
     case "type_alias":
       // Type aliases are usually short — signature is enough
       break;

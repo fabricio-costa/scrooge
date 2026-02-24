@@ -9,6 +9,8 @@ export interface ApiContext {
   repoPath?: string;
   /** Override dbPath for testing (e.g., ":memory:") */
   dbPath?: string;
+  /** AI model identifier (e.g., "claude-opus-4-6") from SCROOGE_MODEL env var */
+  model?: string;
 }
 
 // --- Search ---

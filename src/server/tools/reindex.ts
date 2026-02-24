@@ -1,11 +1,6 @@
-import { basename } from "node:path";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { openDb, recordToolCall } from "../../storage/db.js";
-import { getConfig } from "../../utils/config.js";
-import { runPipeline } from "../../indexer/pipeline.js";
-import { isGitRepo } from "../../utils/git.js";
-import { validateRepoPath } from "../../utils/path-validation.js";
+import { reindex } from "../../api/reindex.js";
 
 export function registerReindexTool(server: McpServer): void {
   server.tool(
@@ -16,61 +11,13 @@ export function registerReindexTool(server: McpServer): void {
       incremental: z.boolean().optional().describe("Incremental index via git diff (default true)"),
     },
     async ({ repo_path, incremental }) => {
-      const startTime = Date.now();
-      const repoPath = validateRepoPath(repo_path ?? process.cwd());
-      const isIncremental = incremental !== false;
-      const repoName = basename(repoPath);
-
-      if (!isGitRepo(repoPath)) {
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: JSON.stringify({ error: "Not a git repository", repo: repoName }),
-            },
-          ],
-        };
-      }
-
-      const config = getConfig();
-      const db = openDb(config.dbPath);
-
-      try {
-        const stats = await runPipeline({
-          repoPath,
-          db,
-          incremental: isIncremental,
-          withEmbeddings: true,
-        });
-
-        recordToolCall(db, {
-          tool: "reindex",
-          repo_path: repoPath,
-          duration_ms: Date.now() - startTime,
-          tokens_sent: 0,
-          tokens_raw: 0,
-          metadata: { ...stats, incremental: isIncremental },
-        });
-
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: JSON.stringify(
-                {
-                  status: "success",
-                  repo: repoName,
-                  ...stats,
-                },
-                null,
-                2,
-              ),
-            },
-          ],
-        };
-      } finally {
-        db.close();
-      }
+      const result = await reindex(
+        { incremental },
+        { channel: "mcp", repoPath: repo_path },
+      );
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+      };
     },
   );
 }

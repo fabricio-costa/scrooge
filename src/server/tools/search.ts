@@ -1,12 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { openDb, recordToolCall } from "../../storage/db.js";
-import { getConfig } from "../../utils/config.js";
-import { hybridSearch } from "../../retrieval/hybrid.js";
-import { packageResults, type ViewMode } from "../../retrieval/packager.js";
-import { estimateTokens } from "../../utils/tokens.js";
-import { ensureFreshIndex, formatReindexNote } from "../../utils/freshness.js";
-import { validateRepoPath } from "../../utils/path-validation.js";
+import { search } from "../../api/search.js";
 
 export function registerSearchTool(server: McpServer): void {
   server.tool(
@@ -26,66 +20,13 @@ export function registerSearchTool(server: McpServer): void {
       token_budget: z.number().int().min(100).max(50000).optional().describe("Maximum tokens in response (default 3000)"),
     },
     async ({ query, repo_path, filters, view, max_results, token_budget }) => {
-      const startTime = Date.now();
-      const repoPath = validateRepoPath(repo_path ?? process.cwd());
-      const config = getConfig();
-      const db = openDb(config.dbPath);
-
-      try {
-        const freshness = await ensureFreshIndex(db, repoPath);
-
-        const results = await hybridSearch(
-          db,
-          repoPath,
-          query,
-          {
-            module: filters?.module,
-            language: filters?.language,
-            kind: filters?.kind,
-            tags: filters?.tags,
-          },
-          max_results ?? config.defaultMaxResults,
-        );
-
-        const viewMode = (view as ViewMode) ?? "sketch";
-        const packaged = packageResults(
-          results,
-          viewMode,
-          token_budget ?? config.defaultTokenBudget,
-        );
-
-        const tokensRaw = results.reduce((sum, r) => sum + estimateTokens(r.chunk.text_raw), 0);
-        const sources = { lexical: 0, vector: 0, both: 0 };
-        for (const r of results) {
-          sources[r.source]++;
-        }
-
-        const reindexNote = formatReindexNote(freshness);
-
-        recordToolCall(db, {
-          tool: "search",
-          repo_path: repoPath,
-          duration_ms: Date.now() - startTime,
-          tokens_sent: packaged.totalTokens,
-          tokens_raw: tokensRaw,
-          metadata: { query, resultCount: packaged.results.length, truncated: packaged.truncated, view: viewMode, sources, autoReindexed: freshness.reindexed },
-        });
-
-        const response = reindexNote
-          ? { ...packaged, _note: reindexNote }
-          : packaged;
-
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: JSON.stringify(response, null, 2),
-            },
-          ],
-        };
-      } finally {
-        db.close();
-      }
+      const result = await search(
+        { query, filters, view, maxResults: max_results, tokenBudget: token_budget },
+        { channel: "mcp", repoPath: repo_path },
+      );
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+      };
     },
   );
 }

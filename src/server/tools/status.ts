@@ -1,10 +1,6 @@
-import { basename } from "node:path";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { openDb, getIndexMeta, recordToolCall } from "../../storage/db.js";
-import { getConfig } from "../../utils/config.js";
-import { isGitRepo, getHeadCommit } from "../../utils/git.js";
-import { validateRepoPath } from "../../utils/path-validation.js";
+import { status } from "../../api/status.js";
 
 export function registerStatusTool(server: McpServer): void {
   server.tool(
@@ -14,81 +10,12 @@ export function registerStatusTool(server: McpServer): void {
       repo_path: z.string().max(500).describe("Absolute path to the repository (defaults to cwd)").optional(),
     },
     async ({ repo_path }) => {
-      const startTime = Date.now();
-      const repoPath = validateRepoPath(repo_path ?? process.cwd());
-      const config = getConfig();
-      const db = openDb(config.dbPath);
-      const repoName = basename(repoPath);
-
-      try {
-        const meta = getIndexMeta(db, repoPath);
-
-        if (!meta) {
-          recordToolCall(db, {
-            tool: "status",
-            repo_path: repoPath,
-            duration_ms: Date.now() - startTime,
-            tokens_sent: 0,
-            tokens_raw: 0,
-            metadata: { freshness: "not_indexed" },
-          });
-
-          return {
-            content: [
-              {
-                type: "text" as const,
-                text: JSON.stringify(
-                  {
-                    status: "not_indexed",
-                    repo: repoName,
-                    message: "Repository has not been indexed yet. Run scrooge_reindex first.",
-                  },
-                  null,
-                  2,
-                ),
-              },
-            ],
-          };
-        }
-
-        let freshness = "unknown";
-        if (isGitRepo(repoPath)) {
-          const currentCommit = getHeadCommit(repoPath);
-          freshness = currentCommit === meta.last_commit_sha ? "up_to_date" : "stale";
-        }
-
-        recordToolCall(db, {
-          tool: "status",
-          repo_path: repoPath,
-          duration_ms: Date.now() - startTime,
-          tokens_sent: 0,
-          tokens_raw: 0,
-          metadata: { freshness },
-        });
-
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: JSON.stringify(
-                {
-                  status: "indexed",
-                  repo: repoName,
-                  last_commit_sha: meta.last_commit_sha,
-                  last_indexed_at: meta.last_indexed_at,
-                  total_chunks: meta.total_chunks,
-                  total_files: meta.total_files,
-                  freshness,
-                },
-                null,
-                2,
-              ),
-            },
-          ],
-        };
-      } finally {
-        db.close();
-      }
+      const result = await status(
+        { channel: "mcp", repoPath: repo_path },
+      );
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+      };
     },
   );
 }

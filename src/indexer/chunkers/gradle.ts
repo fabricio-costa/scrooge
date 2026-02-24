@@ -72,6 +72,13 @@ function extractBlock(content: string, startOffset: number): string | null {
   return null;
 }
 
+function redactSigningPasswords(text: string): string {
+  return text.replace(
+    /((?:storePassword|keyPassword)\s*(?:[=:]?\s*))(['"])[^'"]*\2/g,
+    "$1$2<REDACTED>$2",
+  );
+}
+
 function makeBlockChunk(
   filePath: string,
   text: string,
@@ -80,7 +87,8 @@ function makeBlockChunk(
   kind: ChunkKind,
   symbolName: string,
 ): Chunk {
-  const contentHash = hashContent(text);
+  const safeText = kind === "gradle_signing" ? redactSigningPasswords(text) : text;
+  const contentHash = hashContent(safeText);
   const id = chunkId(filePath, startLine, endLine, contentHash);
 
   return {
@@ -91,8 +99,8 @@ function makeBlockChunk(
     symbolName,
     startLine,
     endLine,
-    textRaw: text,
-    textSketch: truncateToTokenBudget(text, 200),
+    textRaw: safeText,
+    textSketch: truncateToTokenBudget(safeText, 200),
     tags: ["gradle"],
     annotations: [],
     defines: [],

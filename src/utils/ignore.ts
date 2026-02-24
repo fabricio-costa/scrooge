@@ -61,6 +61,34 @@ const ALWAYS_IGNORE_FILES = new Set([
   "Thumbs.db",
 ]);
 
+const SENSITIVE_FILES = new Set([
+  ".env",
+  ".env.local",
+  ".env.development",
+  ".env.production",
+  ".env.staging",
+  ".env.test",
+  "credentials.json",
+  "service-account.json",
+  "service_account.json",
+  "local.properties",
+  ".npmrc",
+  ".pypirc",
+  "id_rsa",
+  "id_ed25519",
+  "id_ecdsa",
+  "id_dsa",
+]);
+
+const SENSITIVE_EXTENSIONS = new Set([
+  ".pem",
+  ".p12",
+  ".pfx",
+  ".key",
+  ".crt",
+  ".cert",
+]);
+
 export function shouldIgnore(filePath: string): boolean {
   const parts = filePath.split("/");
   const fileName = basename(filePath);
@@ -76,6 +104,10 @@ export function shouldIgnore(filePath: string): boolean {
 
   // Check extension ignores
   if (ALWAYS_IGNORE_EXTENSIONS.has(ext)) return true;
+
+  // Check sensitive files (secrets, credentials, keys)
+  if (SENSITIVE_FILES.has(fileName)) return true;
+  if (SENSITIVE_EXTENSIONS.has(ext)) return true;
 
   return false;
 }

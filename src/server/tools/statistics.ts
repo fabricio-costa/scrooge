@@ -2,6 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { openDb } from "../../storage/db.js";
 import { getConfig } from "../../utils/config.js";
+import { validateRepoPath } from "../../utils/path-validation.js";
 import type Database from "better-sqlite3";
 
 type Period = "today" | "week" | "month" | "all";
@@ -23,14 +24,14 @@ export function registerStatisticsTool(server: McpServer): void {
     "scrooge_statistics",
     "Usage and token savings metrics for Scrooge. Shows how much Scrooge saves over time by comparing compressed responses to raw content costs.",
     {
-      repo_path: z.string().optional().describe("Absolute path to the repository (defaults to cwd)"),
+      repo_path: z.string().max(500).optional().describe("Absolute path to the repository (defaults to cwd)"),
       period: z
         .enum(["today", "week", "month", "all"])
         .optional()
         .describe('Time period to aggregate: "today", "week", "month", "all" (default "all")'),
     },
     async ({ repo_path, period }) => {
-      const repoPath = repo_path ?? process.cwd();
+      const repoPath = validateRepoPath(repo_path ?? process.cwd());
       const config = getConfig();
       const db = openDb(config.dbPath);
 
@@ -52,7 +53,12 @@ export function buildStatisticsReport(
   period: Period,
 ): string {
   const dateFilter = getDateFilter(period);
-  const dateClause = dateFilter ? `AND called_at >= '${dateFilter}'` : "";
+  const params: unknown[] = [repoPath];
+  let dateClause = "";
+  if (dateFilter) {
+    dateClause = "AND called_at >= ?";
+    params.push(dateFilter);
+  }
 
   // Aggregate by tool
   const toolAggs = db
@@ -65,7 +71,7 @@ export function buildStatisticsReport(
        GROUP BY tool
        ORDER BY call_count DESC`,
     )
-    .all(repoPath) as ToolAggregate[];
+    .all(...params) as ToolAggregate[];
 
   if (toolAggs.length === 0) {
     return "No Scrooge usage recorded yet for this repository.";
@@ -82,7 +88,7 @@ export function buildStatisticsReport(
     .prepare(
       `SELECT MIN(called_at) as first_call FROM tool_calls WHERE repo_path = ? ${dateClause}`,
     )
-    .get(repoPath) as { first_call: string | null };
+    .get(...params) as { first_call: string | null };
 
   const repoName = repoPath.split("/").pop() ?? repoPath;
   const periodLabel = getPeriodLabel(period, earliest.first_call);
@@ -106,7 +112,7 @@ export function buildStatisticsReport(
   lines.push("");
 
   // Search insights (if any search calls)
-  const searchInsights = getSearchInsights(db, repoPath, dateClause);
+  const searchInsights = getSearchInsights(db, repoPath, dateClause, params);
   if (searchInsights) {
     lines.push("### Search Insights");
     lines.push(
@@ -164,13 +170,22 @@ function getSearchInsights(
   db: Database.Database,
   repoPath: string,
   dateClause: string,
+  baseParams: unknown[],
 ): SearchInsightsResult | null {
+  // Build search-specific params: repoPath + "search" + optional dateFilter
+  const searchParams: unknown[] = [repoPath, "search"];
+  if (baseParams.length > 1) {
+    searchParams.push(baseParams[1]); // the dateFilter value
+  }
+
+  const searchDateClause = dateClause; // already parameterized
+
   const searchCalls = db
     .prepare(
       `SELECT tokens_sent, metadata FROM tool_calls
-       WHERE repo_path = ? AND tool = 'search' ${dateClause}`,
+       WHERE repo_path = ? AND tool = ? ${searchDateClause}`,
     )
-    .all(repoPath) as Array<{ tokens_sent: number; metadata: string | null }>;
+    .all(...searchParams) as Array<{ tokens_sent: number; metadata: string | null }>;
 
   if (searchCalls.length === 0) return null;
 

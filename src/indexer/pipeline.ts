@@ -25,6 +25,7 @@ import { filterFiles } from "../utils/ignore.js";
 const chunkers: ChunkerPlugin[] = [
   kotlinChunker,
   typescriptChunker,
+  dartChunker,
   xmlAndroidChunker,
   gradleChunker,
   genericChunker, // must be last (fallback)

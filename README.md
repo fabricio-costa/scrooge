@@ -122,25 +122,19 @@ The launcher script (`bin/scrooge-mcp.mjs`) automatically detects when native mo
 
 ## Quick Start
 
-Once registered, Scrooge tools are available in any Claude Code session.
+Once registered, Scrooge tools are available in any Claude Code session. **No manual indexing required** — the index is created and maintained automatically.
 
-**1. Index a repository**
-
-```
-> Use scrooge_reindex to index this repository
-```
-
-Scrooge walks the repo, classifies files, chunks them semantically (using tree-sitter for Kotlin, TypeScript, and Dart), generates compressed sketches, computes embeddings, and stores everything in a local SQLite database.
-
-**2. Search the codebase**
+**1. Search the codebase**
 
 ```
 > Use scrooge_search to find authentication-related code
 ```
 
+On the first query, Scrooge automatically indexes the repository. On subsequent queries, if the repo has new commits, an incremental reindex runs transparently before returning results. You never need to think about `scrooge_reindex` — the index stays fresh automatically.
+
 Returns ranked results with sketch-compressed snippets, staying within a token budget.
 
-**3. Explore the repo map**
+**2. Explore the repo map**
 
 ```
 > Use scrooge_map at repo level to see the project structure
@@ -148,13 +142,13 @@ Returns ranked results with sketch-compressed snippets, staying within a token b
 
 Returns a directory tree with hierarchical summaries of each module.
 
-**4. Look up a symbol**
+**3. Look up a symbol**
 
 ```
 > Use scrooge_lookup to find where LoginViewModel is defined and used
 ```
 
-**5. Check your savings**
+**4. Check your savings**
 
 ```
 > Use scrooge_statistics to see token savings
@@ -290,6 +284,7 @@ src/
     ├── config.ts          # Configuration with defaults
     ├── tokens.ts          # Token count estimation
     ├── git.ts             # Git operations (diff, log, file listing)
+    ├── freshness.ts       # Auto-reindex: ensures index is fresh before queries
     └── embeddings.ts      # Local embeddings via @xenova/transformers
 ```
 
@@ -356,6 +351,23 @@ Scrooge uses [all-MiniLM-L6-v2](https://huggingface.co/sentence-transformers/all
 During indexing, Scrooge embeds each chunk's **sketch** (not the raw source). This is intentional — the sketch contains the semantic essence (signatures, names, structure) without implementation noise, producing higher-quality embeddings for code search.
 
 During search, the user's query is embedded with the same model and compared against all stored vectors using sqlite-vec's cosine distance.
+
+### Auto-reindex
+
+Scrooge automatically keeps the index fresh. Before every `search`, `map`, or `lookup` call, it compares the repository's current `HEAD` with the last indexed commit. If they differ, an incremental reindex runs transparently before returning results.
+
+```
+Tool called (search/map/lookup)
+       │
+       ▼
+  HEAD == last_indexed_sha?
+  ├─ yes → proceed normally
+  └─ no  → incremental reindex → proceed
+```
+
+This means you never need to call `scrooge_reindex` manually — the index is always up to date when you query it. The first query on an unindexed repo triggers a full index automatically.
+
+When auto-reindex occurs, a `_note` field is included in the response with timing and file count details.
 
 ### Search flow
 

@@ -5,6 +5,7 @@ import { getConfig } from "../../utils/config.js";
 import { generateTree, renderTree } from "../../repomap/tree.js";
 import { getModuleSummaries, getFileSummaries } from "../../repomap/summaries.js";
 import { estimateTokens } from "../../utils/tokens.js";
+import { ensureFreshIndex, formatReindexNote } from "../../utils/freshness.js";
 
 export function registerMapTool(server: McpServer): void {
   server.tool(
@@ -22,6 +23,8 @@ export function registerMapTool(server: McpServer): void {
       const db = openDb(config.dbPath);
 
       try {
+        const freshness = await ensureFreshIndex(db, repoPath);
+
         const detailLevel = level ?? "repo";
         const output: string[] = [];
 
@@ -78,6 +81,11 @@ export function registerMapTool(server: McpServer): void {
           }
         }
 
+        const reindexNote = formatReindexNote(freshness);
+        if (reindexNote) {
+          output.unshift(`> ${reindexNote}\n`);
+        }
+
         const outputText = output.join("\n");
         const tokensSent = estimateTokens(outputText);
 
@@ -96,7 +104,7 @@ export function registerMapTool(server: McpServer): void {
           duration_ms: Date.now() - startTime,
           tokens_sent: tokensSent,
           tokens_raw: tokensRaw,
-          metadata: { level: detailLevel, module: module ?? null },
+          metadata: { level: detailLevel, module: module ?? null, autoReindexed: freshness.reindexed },
         });
 
         return {

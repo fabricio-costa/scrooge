@@ -5,6 +5,7 @@ import { getConfig } from "../../utils/config.js";
 import { hybridSearch } from "../../retrieval/hybrid.js";
 import { packageResults, type ViewMode } from "../../retrieval/packager.js";
 import { estimateTokens } from "../../utils/tokens.js";
+import { ensureFreshIndex, formatReindexNote } from "../../utils/freshness.js";
 
 export function registerSearchTool(server: McpServer): void {
   server.tool(
@@ -30,6 +31,8 @@ export function registerSearchTool(server: McpServer): void {
       const db = openDb(config.dbPath);
 
       try {
+        const freshness = await ensureFreshIndex(db, repoPath);
+
         const results = await hybridSearch(
           db,
           repoPath,
@@ -56,20 +59,26 @@ export function registerSearchTool(server: McpServer): void {
           sources[r.source]++;
         }
 
+        const reindexNote = formatReindexNote(freshness);
+
         recordToolCall(db, {
           tool: "search",
           repo_path: repoPath,
           duration_ms: Date.now() - startTime,
           tokens_sent: packaged.totalTokens,
           tokens_raw: tokensRaw,
-          metadata: { query, resultCount: packaged.results.length, truncated: packaged.truncated, view: viewMode, sources },
+          metadata: { query, resultCount: packaged.results.length, truncated: packaged.truncated, view: viewMode, sources, autoReindexed: freshness.reindexed },
         });
+
+        const response = reindexNote
+          ? { ...packaged, _note: reindexNote }
+          : packaged;
 
         return {
           content: [
             {
               type: "text" as const,
-              text: JSON.stringify(packaged, null, 2),
+              text: JSON.stringify(response, null, 2),
             },
           ],
         };

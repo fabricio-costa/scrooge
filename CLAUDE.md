@@ -141,6 +141,7 @@ Sources: lexical 30% | vector 25% | both 45%
 - **Retrieval** (`src/retrieval/`): Hybrid search (FTS5 lexical + sqlite-vec vector) with RRF fusion and token-budgeted packaging
 - **Repo Map** (`src/repomap/`): Directory tree and hierarchical summaries from indexed data
 - **Storage** (`src/storage/`): SQLite with better-sqlite3, FTS5 for lexical search, sqlite-vec for vector search
+- **Auto-reindex**: Search, map, and lookup automatically refresh the index when HEAD differs from last indexed commit (`src/utils/freshness.ts`). No manual `scrooge_reindex` needed
 
 ## Database
 

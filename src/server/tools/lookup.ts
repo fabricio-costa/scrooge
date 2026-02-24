@@ -3,6 +3,7 @@ import { z } from "zod";
 import { openDb, recordToolCall, type ChunkRow } from "../../storage/db.js";
 import { getConfig } from "../../utils/config.js";
 import { estimateTokens } from "../../utils/tokens.js";
+import { ensureFreshIndex, formatReindexNote } from "../../utils/freshness.js";
 
 export function registerLookupTool(server: McpServer): void {
   server.tool(
@@ -21,6 +22,8 @@ export function registerLookupTool(server: McpServer): void {
       const escapedSymbol = symbol.replace(/"/g, '""');
 
       try {
+        const freshness = await ensureFreshIndex(db, repoPath);
+
         // Find definition
         const definitions = db
           .prepare(`
@@ -69,6 +72,11 @@ export function registerLookupTool(server: McpServer): void {
           result.usages = allUsages.map(formatChunk);
         }
 
+        const reindexNote = formatReindexNote(freshness);
+        if (reindexNote) {
+          result._note = reindexNote;
+        }
+
         const responseText = JSON.stringify(result, null, 2);
         const tokensRaw = [...definitions, ...allUsages].reduce((sum, c) => sum + estimateTokens(c.text_raw), 0);
 
@@ -78,7 +86,7 @@ export function registerLookupTool(server: McpServer): void {
           duration_ms: Date.now() - startTime,
           tokens_sent: estimateTokens(responseText),
           tokens_raw: tokensRaw,
-          metadata: { symbol, definitionCount: definitions.length, usageCount: allUsages.length },
+          metadata: { symbol, definitionCount: definitions.length, usageCount: allUsages.length, autoReindexed: freshness.reindexed },
         });
 
         return {

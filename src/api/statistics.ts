@@ -92,6 +92,20 @@ export function buildStatisticsReport(
   lines.push(`Saved:           ${saved.toLocaleString("en-US")} (${savingsPct}%)`);
   lines.push("");
 
+  // Savings by tool (only tools with tokens_raw > 0)
+  const toolsWithSavings = toolAggs.filter((t) => t.total_tokens_raw > 0);
+  if (toolsWithSavings.length > 0) {
+    lines.push("### Savings by Tool");
+    for (const t of toolsWithSavings) {
+      const toolSaved = t.total_tokens_raw - t.total_tokens_sent;
+      const toolPct = ((toolSaved / t.total_tokens_raw) * 100).toFixed(1);
+      lines.push(
+        `${t.tool}: ${t.total_tokens_sent.toLocaleString("en-US")} delivered / ${t.total_tokens_raw.toLocaleString("en-US")} raw (${toolPct}% saved)`,
+      );
+    }
+    lines.push("");
+  }
+
   // Usage breakdown
   const usageParts = toolAggs.map((t) => `${t.tool}: ${t.call_count}`);
   lines.push(`### Usage (${totalCalls} total calls)`);

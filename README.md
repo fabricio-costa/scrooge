@@ -82,6 +82,7 @@
 - **`scrooge_reindex`** — Trigger full or incremental indexing of a repository
 - **`scrooge_status`** — Check index freshness: last indexed commit, total chunks, staleness
 - **`scrooge_statistics`** — Usage metrics and token savings breakdown over configurable time periods
+- **Multi-channel** — Shared API layer supports Claude Code (MCP) and pi.dev (extension) with per-channel telemetry
 
 ## Prerequisites
 
@@ -119,6 +120,26 @@ claude mcp add scrooge -- npx tsx /absolute/path/to/scrooge/src/index.ts
 ### Self-healing launcher
 
 The launcher script (`bin/scrooge-mcp.mjs`) automatically detects when native modules (`better-sqlite3`, `tree-sitter`) were compiled against a different Node.js version and rebuilds them before starting the server. This prevents the dreaded `NODE_MODULE_VERSION` mismatch error when switching Node versions between projects.
+
+## Integrations
+
+### Claude Code (MCP)
+
+See [Registering with Claude Code](#registering-with-claude-code) above. All 6 tools are available as MCP tools with `channel: "mcp"` telemetry.
+
+### pi.dev (Extension)
+
+Scrooge is also available as a [pi.dev](https://pi.dev) extension, providing the same 6 tools inside pi sessions with `channel: "pi"` telemetry.
+
+```bash
+# From npm:
+pi install npm:@fabricio-costa/pi-scrooge
+
+# Local development:
+pi install /path/to/scrooge/packages/pi-extension
+```
+
+Both integrations share the same database (`~/.scrooge/scrooge.db`) and `scrooge_statistics` shows per-channel usage breakdowns.
 
 ## Quick Start
 
@@ -262,9 +283,18 @@ Sources: lexical 30% | vector 25% | both 45%
 ```
 src/
 ├── index.ts              # Entry point — starts MCP server
+├── api/                  # Transport-agnostic API layer (shared by MCP + pi.dev)
+│   ├── index.ts          # Barrel export
+│   ├── types.ts          # Shared request/response interfaces, Channel type
+│   ├── search.ts         # search() — orchestrates hybrid search + telemetry
+│   ├── lookup.ts         # lookup() — symbol definitions + usages + telemetry
+│   ├── map.ts            # map() — repo tree + summaries + telemetry
+│   ├── reindex.ts        # reindex() — pipeline trigger + telemetry
+│   ├── status.ts         # status() — index freshness check + telemetry
+│   └── statistics.ts     # statistics() + buildStatisticsReport()
 ├── server/
 │   ├── mcp.ts            # MCP server creation and tool registration
-│   └── tools/            # One file per tool (search, map, lookup, reindex, status, statistics)
+│   └── tools/            # Thin MCP adapters: Zod schema → API call → JSON response
 ├── indexer/
 │   ├── pipeline.ts       # Orchestrates: classify → chunk → sketch → embed → store
 │   ├── classifier.ts     # File type detection (Kotlin, TypeScript, Dart, XML, Gradle, generic)
@@ -472,6 +502,7 @@ Test fixtures in `test/fixtures/` include Kotlin source files, TypeScript/TSX mo
 | `zod` | ^3.24.0 | Runtime schema validation |
 | `typescript` | ^5.7.0 | Type system and compiler |
 | `vitest` | ^4.0.18 | Test framework |
+| `@sinclair/typebox` | ^0.34.0 | Schema validation for pi.dev extension |
 | `eslint` | ^10.0.1 | Linting |
 
 ## License

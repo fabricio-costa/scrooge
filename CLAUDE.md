@@ -137,7 +137,7 @@ Sources: lexical 30% | vector 25% | both 45%
 ## Architecture
 
 - **MCP Server** (`src/server/`): Stdio transport, 6 tools (search, map, lookup, reindex, status, statistics)
-- **Indexer** (`src/indexer/`): Pipeline that classifies files, chunks them semantically (tree-sitter for Kotlin and TypeScript), generates sketches, and computes embeddings
+- **Indexer** (`src/indexer/`): Pipeline that classifies files, chunks them semantically (tree-sitter for Kotlin, TypeScript, and Dart), generates sketches, and computes embeddings
 - **Retrieval** (`src/retrieval/`): Hybrid search (FTS5 lexical + sqlite-vec vector) with RRF fusion and token-budgeted packaging
 - **Repo Map** (`src/repomap/`): Directory tree and hierarchical summaries from indexed data
 - **Storage** (`src/storage/`): SQLite with better-sqlite3, FTS5 for lexical search, sqlite-vec for vector search

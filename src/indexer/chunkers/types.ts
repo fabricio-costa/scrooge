@@ -21,6 +21,7 @@ export type ChunkKind =
   | "gradle_dependencies"
   | "gradle_signing"
   | "gradle_settings"
+  | "dataclass"
   | "mixin"
   | "extension"
   | "generic_block"

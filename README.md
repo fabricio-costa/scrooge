@@ -307,7 +307,7 @@ Repository files
   └─────────┘     └──────────┘     └──────────┘     └─────────┘     └─────────┘
 ```
 
-1. **Classify** — Detect file type by extension (`.kt` → Kotlin, `.ts`/`.tsx` → TypeScript, `.xml` → XML, `.gradle.kts` → Gradle, everything else → generic)
+1. **Classify** — Detect file type by extension (`.kt` → Kotlin, `.ts`/`.tsx` → TypeScript, `.dart` → Dart, `.xml` → XML, `.gradle.kts` → Gradle, everything else → generic)
 2. **Chunk** — Parse into semantic units. See [Supported Languages](#supported-languages) below
 3. **Sketch** — Compress each chunk into a token-efficient summary. See [Sketches](#sketches) below
 4. **Embed** — Compute vector embeddings for semantic search. See [Embeddings](#embeddings) below

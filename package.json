@@ -32,7 +32,7 @@
     "tree-sitter": "^0.21.1",
     "tree-sitter-dart": "github:UserNobody14/tree-sitter-dart#c1222f5",
     "tree-sitter-kotlin": "^0.3.8",
-    "tree-sitter-python": "^0.21.0",
+    "tree-sitter-python": "^0.25.0",
     "tree-sitter-typescript": "^0.23.2",
     "zod": "^3.24.0"
   },

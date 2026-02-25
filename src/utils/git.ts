@@ -1,6 +1,7 @@
 import { execFileSync } from "node:child_process";
 
 const SHA_RE = /^[0-9a-f]{4,40}$/i;
+const GIT_ENV = { ...process.env, GIT_CONFIG_NOSYSTEM: "1" };
 
 function assertSha(value: string, label: string): void {
   if (!SHA_RE.test(value)) {
@@ -9,9 +10,10 @@ function assertSha(value: string, label: string): void {
 }
 
 export function getHeadCommit(repoPath: string): string {
-  return execFileSync("git", ["rev-parse", "HEAD"], {
+  return execFileSync("git", ["--no-optional-locks", "rev-parse", "HEAD"], {
     cwd: repoPath,
     encoding: "utf-8",
+    env: GIT_ENV,
   }).trim();
 }
 
@@ -19,9 +21,10 @@ export function getChangedFiles(repoPath: string, fromCommit: string, toCommit: 
   assertSha(fromCommit, "fromCommit");
   if (toCommit !== "HEAD") assertSha(toCommit, "toCommit");
 
-  const output = execFileSync("git", ["diff", "--name-only", `${fromCommit}..${toCommit}`], {
+  const output = execFileSync("git", ["--no-optional-locks", "diff", "--name-only", `${fromCommit}..${toCommit}`], {
     cwd: repoPath,
     encoding: "utf-8",
+    env: GIT_ENV,
   });
   return output
     .split("\n")
@@ -33,9 +36,10 @@ export function getDeletedFiles(repoPath: string, fromCommit: string, toCommit: 
   assertSha(fromCommit, "fromCommit");
   if (toCommit !== "HEAD") assertSha(toCommit, "toCommit");
 
-  const output = execFileSync("git", ["diff", "--name-only", "--diff-filter=D", `${fromCommit}..${toCommit}`], {
+  const output = execFileSync("git", ["--no-optional-locks", "diff", "--name-only", "--diff-filter=D", `${fromCommit}..${toCommit}`], {
     cwd: repoPath,
     encoding: "utf-8",
+    env: GIT_ENV,
   });
   return output
     .split("\n")
@@ -44,9 +48,10 @@ export function getDeletedFiles(repoPath: string, fromCommit: string, toCommit: 
 }
 
 export function getTrackedFiles(repoPath: string): string[] {
-  const output = execFileSync("git", ["ls-files"], {
+  const output = execFileSync("git", ["--no-optional-locks", "ls-files"], {
     cwd: repoPath,
     encoding: "utf-8",
+    env: GIT_ENV,
   });
   return output
     .split("\n")
@@ -56,10 +61,11 @@ export function getTrackedFiles(repoPath: string): string[] {
 
 export function isGitRepo(repoPath: string): boolean {
   try {
-    execFileSync("git", ["rev-parse", "--is-inside-work-tree"], {
+    execFileSync("git", ["--no-optional-locks", "rev-parse", "--is-inside-work-tree"], {
       cwd: repoPath,
       encoding: "utf-8",
       stdio: ["pipe", "pipe", "pipe"],
+      env: GIT_ENV,
     });
     return true;
   } catch {

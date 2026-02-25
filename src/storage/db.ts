@@ -1,4 +1,6 @@
 import { chmodSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import Database from "better-sqlite3";
 import * as sqliteVec from "sqlite-vec";
 
@@ -68,7 +70,7 @@ CREATE TABLE IF NOT EXISTS index_meta (
 `;
 
 export function openDb(dbPath?: string): Database.Database {
-  const resolvedPath = dbPath ?? (process.env.HOME ?? "~") + "/.scrooge/scrooge.db";
+  const resolvedPath = dbPath ?? join(homedir(), ".scrooge", "scrooge.db");
   const db = new Database(resolvedPath);
 
   db.pragma("journal_mode = WAL");

@@ -18,8 +18,9 @@ export async function search(
 
   try {
     const freshness = await ensureFreshIndex(db, repoPath);
+    const freshnessEnd = Date.now();
 
-    const results = await hybridSearch(
+    const { results, metrics } = await hybridSearch(
       db,
       repoPath,
       params.query,
@@ -31,6 +32,7 @@ export async function search(
       },
       params.maxResults ?? config.defaultMaxResults,
     );
+    const searchEnd = Date.now();
 
     const viewMode: ViewMode = params.view ?? "sketch";
     const packaged = packageResults(
@@ -64,6 +66,27 @@ export async function search(
         view: viewMode,
         sources,
         autoReindexed: freshness.reindexed,
+        timing: {
+          freshness_ms: freshnessEnd - startTime,
+          search_ms: searchEnd - freshnessEnd,
+          packaging_ms: Date.now() - searchEnd,
+        },
+        retrieval: {
+          lexicalCandidates: metrics.lexicalCandidates,
+          vectorCandidates: metrics.vectorCandidates,
+          candidatesBeforeFusion: metrics.candidatesBeforeFusion,
+          rrfK: metrics.rrfK,
+        },
+        packager: {
+          diversityRejected: packaged.stats.diversityRejected,
+          uniqueFiles: packaged.stats.uniqueFiles,
+          budgetUtilization: packaged.stats.tokenBudgetUtilization,
+        },
+        topScores: metrics.scores.slice(0, 5).map((s) => ({
+          rrf: Math.round(s.rrfScore * 100000) / 100000,
+          lex_rank: s.lexicalRank,
+          vec_rank: s.vectorRank,
+        })),
       },
     });
 

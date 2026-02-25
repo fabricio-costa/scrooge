@@ -4,10 +4,21 @@ import { getConfig } from "../utils/config.js";
 
 export type ViewMode = "sketch" | "raw";
 
+export interface PackagerStats {
+  inputCount: number;
+  afterDiversity: number;
+  diversityRejected: number;
+  uniqueFiles: number;
+  tokenBudget: number;
+  tokenBudgetUsed: number;
+  tokenBudgetUtilization: number;
+}
+
 export interface PackagedResult {
   results: PackagedChunk[];
   totalTokens: number;
   truncated: boolean;
+  stats: PackagerStats;
 }
 
 export interface PackagedChunk {
@@ -45,6 +56,8 @@ export function packageResults(
     diverse.push(result);
   }
 
+  const uniqueFiles = new Set(diverse.map((r) => r.chunk.path)).size;
+
   // Package with token budget
   const packaged: PackagedChunk[] = [];
   let totalTokens = 0;
@@ -54,7 +67,16 @@ export function packageResults(
     const tokens = estimateTokens(snippet);
 
     if (totalTokens + tokens > budget) {
-      return { results: packaged, totalTokens, truncated: true };
+      const stats: PackagerStats = {
+        inputCount: results.length,
+        afterDiversity: diverse.length,
+        diversityRejected: results.length - diverse.length,
+        uniqueFiles,
+        tokenBudget: budget,
+        tokenBudgetUsed: totalTokens,
+        tokenBudgetUtilization: budget > 0 ? totalTokens / budget : 0,
+      };
+      return { results: packaged, totalTokens, truncated: true, stats };
     }
 
     packaged.push({
@@ -70,5 +92,14 @@ export function packageResults(
     totalTokens += tokens;
   }
 
-  return { results: packaged, totalTokens, truncated: false };
+  const stats: PackagerStats = {
+    inputCount: results.length,
+    afterDiversity: diverse.length,
+    diversityRejected: results.length - diverse.length,
+    uniqueFiles,
+    tokenBudget: budget,
+    tokenBudgetUsed: totalTokens,
+    tokenBudgetUtilization: budget > 0 ? totalTokens / budget : 0,
+  };
+  return { results: packaged, totalTokens, truncated: false, stats };
 }

@@ -1,0 +1,15 @@
+{"query": "hybrid search RRF fusion", "repo": ".", "expected": ["src/retrieval/hybrid.ts"], "expected_symbols": ["hybridSearch"], "tags": ["retrieval"]}
+{"query": "sqlite database schema migrations", "repo": ".", "expected": ["src/storage/db.ts"], "expected_symbols": ["openDb", "runMigrations"], "tags": ["storage"]}
+{"query": "token estimation count", "repo": ".", "expected": ["src/utils/tokens.ts"], "expected_symbols": ["estimateTokens"], "tags": ["utils"]}
+{"query": "tree-sitter kotlin chunker", "repo": ".", "expected": ["src/indexer/chunkers/kotlin.ts"], "tags": ["indexer"]}
+{"query": "MCP server tool registration", "repo": ".", "expected": ["src/server/mcp.ts"], "expected_symbols": ["createServer"], "tags": ["server"]}
+{"query": "FTS5 lexical search BM25", "repo": ".", "expected": ["src/retrieval/lexical.ts"], "expected_symbols": ["lexicalSearch"], "tags": ["retrieval"]}
+{"query": "vector similarity search embeddings", "repo": ".", "expected": ["src/retrieval/vector.ts"], "expected_symbols": ["vectorSearch"], "tags": ["retrieval"]}
+{"query": "package results token budget diversity", "repo": ".", "expected": ["src/retrieval/packager.ts"], "expected_symbols": ["packageResults"], "tags": ["retrieval"]}
+{"query": "repository map directory tree", "repo": ".", "expected": ["src/repomap/map.ts"], "tags": ["repomap"]}
+{"query": "file classifier language detection", "repo": ".", "expected": ["src/indexer/classifier.ts"], "tags": ["indexer"]}
+{"query": "code sketch generation compression", "repo": ".", "expected": ["src/indexer/sketcher.ts"], "tags": ["indexer"]}
+{"query": "embedding model transformer", "repo": ".", "expected": ["src/indexer/embedder.ts"], "expected_symbols": ["embed"], "tags": ["indexer"]}
+{"query": "search API handler", "repo": ".", "expected": ["src/api/search.ts"], "expected_symbols": ["search"], "tags": ["api"]}
+{"query": "configuration settings defaults", "repo": ".", "expected": ["src/utils/config.ts"], "expected_symbols": ["getConfig"], "tags": ["utils"]}
+{"query": "index freshness auto reindex", "repo": ".", "expected": ["src/utils/freshness.ts"], "expected_symbols": ["ensureFreshIndex"], "tags": ["utils"]}

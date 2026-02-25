@@ -6,6 +6,8 @@ import { registerMapTool } from "./tools/map.js";
 import { registerLookupTool } from "./tools/lookup.js";
 import { registerReindexTool } from "./tools/reindex.js";
 import { registerStatisticsTool } from "./tools/statistics.js";
+import { registerContextTool } from "./tools/context.js";
+import { registerDepsTool } from "./tools/deps.js";
 
 export function createServer(): McpServer {
   const server = new McpServer({
@@ -19,6 +21,8 @@ export function createServer(): McpServer {
   registerLookupTool(server);
   registerReindexTool(server);
   registerStatisticsTool(server);
+  registerContextTool(server);
+  registerDepsTool(server);
 
   return server;
 }

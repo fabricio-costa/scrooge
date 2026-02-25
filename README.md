@@ -105,18 +105,24 @@
 git clone https://github.com/fabricio-costa/scrooge.git
 cd scrooge
 npm install
-npm run build
+npm run setup
 ```
 
-## Registering with your Agent
+`npm run setup` builds the project, registers the MCP server with Claude Code (user scope), configures the PreToolUse hook for automatic pattern injection, and optionally installs the pi.dev extension.
 
-Scrooge supports multiple AI agents through a shared API layer. Both integrations use the same database (`~/.scrooge/scrooge.db`) and `scrooge_statistics` shows per-channel usage breakdowns.
+To uninstall: `npm run uninstall`
+
+<details>
+<summary>Manual registration (advanced)</summary>
 
 ### Claude Code (MCP)
 
 Register at **user scope** so Scrooge is available from any project directory:
 
 ```bash
+# Build first:
+npm run build
+
 # Production (uses compiled JS):
 claude mcp add -s user scrooge -- node /absolute/path/to/scrooge/bin/scrooge-mcp.mjs
 
@@ -124,19 +130,17 @@ claude mcp add -s user scrooge -- node /absolute/path/to/scrooge/bin/scrooge-mcp
 claude mcp add scrooge -- npx tsx /absolute/path/to/scrooge/src/index.ts
 ```
 
-The launcher script (`bin/scrooge-mcp.mjs`) automatically detects when native modules (`better-sqlite3`, `tree-sitter`) were compiled against a different Node.js version and rebuilds them before starting the server. This prevents the dreaded `NODE_MODULE_VERSION` mismatch error when switching Node versions between projects.
+The launcher script (`bin/scrooge-mcp.mjs`) automatically detects when native modules (`better-sqlite3`, `tree-sitter`) were compiled against a different Node.js version and rebuilds them before starting the server.
 
 ### pi.dev (Extension)
 
 ```bash
-# Build scrooge first:
-npm run build
-
-# Install the extension:
 pi install /path/to/scrooge/packages/pi-extension
 ```
 
 Pi.dev loads TypeScript extensions via jiti — no build step needed for the extension itself. Hot-reload with `/reload`.
+
+</details>
 
 ## Quick Start
 
@@ -338,11 +342,14 @@ Sources: lexical 30% | vector 25% | both 45%
 
 ## Execution-Phase Hooks
 
-Scrooge can automatically inject project patterns before Write/Edit operations, so the agent writes code matching existing conventions without manual tool calls.
+Scrooge can automatically inject project patterns before Write/Edit operations, so the agent writes code matching existing conventions without manual tool calls. `npm run setup` configures hooks automatically.
+
+<details>
+<summary>Manual hook configuration</summary>
 
 ### Claude Code (PreToolUse)
 
-Add to your project's `.claude/settings.json`:
+Add to `~/.claude/settings.json` (user scope) or your project's `.claude/settings.json`:
 
 ```json
 {
@@ -364,6 +371,8 @@ The hook reads the tool invocation from stdin, checks if the target file is a su
 ### pi.dev (automatic)
 
 The pi.dev extension automatically intercepts `write`/`edit` operations on supported file types via the `tool_call` event. No additional configuration needed — install the extension and it activates automatically.
+
+</details>
 
 ## Architecture
 
@@ -559,6 +568,8 @@ rm ~/.scrooge/scrooge.db
 
 | Command | Description |
 |---------|-------------|
+| `npm run setup` | Build, register MCP server, configure hooks |
+| `npm run uninstall` | Remove all registrations and hooks |
 | `npm test` | Run all tests (vitest) |
 | `npm run test:watch` | Watch mode |
 | `npm run build` | Compile TypeScript to `dist/` |

@@ -15,24 +15,10 @@ Local MCP server for code-aware Repo Map + Hybrid RAG, reducing token spend in a
 
 ```bash
 npm install
-npm test
-npm run build
+npm run setup    # Builds, registers MCP server, configures hooks
 ```
 
-## Register as MCP Server in Claude Code
-
-The launcher script (`bin/scrooge-mcp.mjs`) auto-detects Node.js version mismatches and rebuilds native modules when needed. Register at **user scope** so it works from all projects:
-
-```bash
-# Build first:
-npm run build
-
-# Register (user scope — available in all projects):
-claude mcp add -s user scrooge -- node /absolute/path/to/scrooge/bin/scrooge-mcp.mjs
-
-# Development:
-claude mcp add scrooge -- npx tsx /absolute/path/to/scrooge/src/index.ts
-```
+For manual registration or development setup, see the README.
 
 ## Tools Reference
 
@@ -199,24 +185,9 @@ Sources: lexical 30% | vector 25% | both 45%
 
 Scrooge can automatically inject project patterns before Write/Edit operations, so the agent writes code matching existing conventions without manual tool calls.
 
+`npm run setup` configures hooks automatically. For manual configuration, see the README.
+
 ### Claude Code (PreToolUse)
-
-Add to your project's `.claude/settings.json`:
-
-```json
-{
-  "hooks": {
-    "PreToolUse": [{
-      "matcher": "Write|Edit",
-      "hooks": [{
-        "type": "command",
-        "command": "node /absolute/path/to/scrooge/bin/scrooge-hook.mjs",
-        "timeout": 3
-      }]
-    }]
-  }
-}
-```
 
 The hook reads the tool invocation from stdin, checks if the target file is a supported language (`.kt`, `.ts`, `.tsx`, `.dart`, `.py`), and injects project patterns as `additionalContext`. Timeout is 1.5s with silent failure.
 

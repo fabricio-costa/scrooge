@@ -1,18 +1,24 @@
 /**
  * Scrooge pi.dev Extension
  *
- * Registers Scrooge's 6 code intelligence tools in pi.dev's tool system.
+ * Registers Scrooge's 8 code intelligence tools in pi.dev's tool system.
  * Each tool delegates to the shared API layer with channel: "pi" for telemetry.
+ *
+ * Also registers a tool_call hook for automatic context injection before
+ * write/edit operations on supported file types.
  *
  * Installation:
  *   pi install /path/to/scrooge/packages/pi-extension
  */
 
 import { Type } from "@sinclair/typebox";
-import { search, lookup, map, reindex, status, statistics } from "scrooge/api";
+import { execSync } from "node:child_process";
+import { search, lookup, map, reindex, status, statistics, context, deps } from "scrooge/api";
 import type { Channel } from "scrooge/api";
 
 const CHANNEL: Channel = "pi";
+
+const SUPPORTED_EXTENSIONS = ["kt", "ts", "tsx", "dart", "py"];
 
 // Minimal type for pi.dev's ExtensionAPI — avoids hard dep on @mariozechner/pi-coding-agent
 interface PiExtensionAPI {
@@ -29,6 +35,10 @@ interface PiExtensionAPI {
       ctx: unknown,
     ): Promise<{ content: Array<{ type: string; text: string }>; details: Record<string, unknown> }>;
   }): void;
+  on(
+    event: string,
+    handler: (event: Record<string, unknown>, ctx: unknown) => Promise<unknown> | unknown,
+  ): void;
 }
 
 export default function (pi: PiExtensionAPI): void {
@@ -164,5 +174,99 @@ export default function (pi: PiExtensionAPI): void {
       );
       return { content: [{ type: "text", text: result.report }], details: {} };
     },
+  });
+
+  // --- scrooge_context ---
+  pi.registerTool({
+    name: "scrooge_context",
+    label: "Scrooge Context",
+    description:
+      "Get project patterns for a given chunk kind. Returns common annotations, tags, imports, and example sketches.",
+    parameters: Type.Object({
+      kind: Type.String({ minLength: 1, maxLength: 100, description: "Chunk kind (e.g., 'viewmodel', 'composable')" }),
+      module: Type.Optional(Type.String({ maxLength: 200, description: "Filter to a specific module" })),
+      repo_path: Type.Optional(Type.String({ maxLength: 500 })),
+    }),
+    async execute(_toolCallId, params) {
+      const result = await context(
+        {
+          kind: params.kind as string,
+          module: params.module as string | undefined,
+        },
+        { channel: CHANNEL, repoPath: params.repo_path as string | undefined, model: process.env.SCROOGE_MODEL },
+      );
+      return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }], details: {} };
+    },
+  });
+
+  // --- scrooge_deps ---
+  pi.registerTool({
+    name: "scrooge_deps",
+    label: "Scrooge Deps",
+    description:
+      "Get a compact dependency graph for a symbol: forward (uses) and reverse (used by) dependencies.",
+    parameters: Type.Object({
+      symbol: Type.String({ minLength: 1, maxLength: 200, description: "Symbol name to look up" }),
+      direction: Type.Optional(
+        Type.Union([Type.Literal("forward"), Type.Literal("reverse"), Type.Literal("both")]),
+      ),
+      repo_path: Type.Optional(Type.String({ maxLength: 500 })),
+    }),
+    async execute(_toolCallId, params) {
+      const result = await deps(
+        {
+          symbol: params.symbol as string,
+          direction: params.direction as "forward" | "reverse" | "both" | undefined,
+        },
+        { channel: CHANNEL, repoPath: params.repo_path as string | undefined, model: process.env.SCROOGE_MODEL },
+      );
+      return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }], details: {} };
+    },
+  });
+
+  // --- Automatic context injection hook ---
+  pi.on("tool_call", async (event) => {
+    const toolName = event.toolName as string | undefined;
+    if (toolName !== "write" && toolName !== "edit") return;
+
+    const input = event.input as Record<string, unknown> | undefined;
+    const filePath = input?.file_path as string | undefined;
+    if (!filePath) return;
+
+    const ext = filePath.split(".").pop();
+    if (!ext || !SUPPORTED_EXTENSIONS.includes(ext)) return;
+
+    try {
+      const repoPath = execSync("git rev-parse --show-toplevel", {
+        encoding: "utf-8",
+        timeout: 2000,
+      }).trim();
+
+      const result = await context(
+        { kind: "function" },
+        { channel: CHANNEL, repoPath, model: process.env.SCROOGE_MODEL },
+      );
+
+      if (result.sampleCount === 0) return;
+
+      const lines: string[] = ["## Project Patterns (auto-injected by Scrooge)"];
+      if (result.commonAnnotations.length > 0) {
+        lines.push(`Annotations: ${result.commonAnnotations.join(", ")}`);
+      }
+      if (result.commonImports.length > 0) {
+        lines.push(`Common imports: ${result.commonImports.join(", ")}`);
+      }
+      if (result.commonTags.length > 0) {
+        lines.push(`Tags: ${result.commonTags.join(", ")}`);
+      }
+      if (result.exampleSketches.length > 0) {
+        lines.push("Example:");
+        lines.push(result.exampleSketches[0].sketch);
+      }
+
+      return { additionalContext: lines.join("\n") };
+    } catch {
+      // Silent failure — don't block the write/edit
+    }
   });
 }

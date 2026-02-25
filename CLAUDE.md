@@ -106,6 +106,52 @@ Get information about the current index state.
 |-------------|--------|----------|-------------|
 | `repo_path` | string | no       | Path to the repository |
 
+### scrooge_context
+
+Get project patterns for a given chunk kind. Returns common annotations, tags, imports, and example sketches — so the agent writes code that matches existing conventions without reading multiple files.
+
+**Parameters:**
+| Parameter   | Type   | Required | Description |
+|-------------|--------|----------|-------------|
+| `kind`      | string | yes      | Chunk kind to query (e.g., `"viewmodel"`, `"composable"`, `"dao"`) |
+| `module`    | string | no       | Filter to a specific module (e.g., `":feature:auth"`) |
+| `repo_path` | string | no       | Path to the repository (defaults to current) |
+
+**Example output:**
+```json
+{
+  "kind": "viewmodel",
+  "sampleCount": 5,
+  "commonAnnotations": ["@HiltViewModel", "@Inject"],
+  "commonTags": ["hilt", "viewmodel", "coroutine"],
+  "commonImports": ["StateFlow", "MutableStateFlow", "viewModelScope"],
+  "exampleSketches": [
+    { "path": "feature/auth/LoginViewModel.kt", "sketch": "class LoginViewModel @Inject constructor(...)" }
+  ]
+}
+```
+
+### scrooge_deps
+
+Get a compact dependency graph for a symbol: forward (what it uses) and reverse (who uses it). Optimized for refactoring decisions — returns only names, paths, and kinds, not full source.
+
+**Parameters:**
+| Parameter   | Type   | Required | Description |
+|-------------|--------|----------|-------------|
+| `symbol`    | string | yes      | Symbol name (e.g., `"AuthRepository"`) |
+| `direction` | string | no       | `"forward"`, `"reverse"`, or `"both"` (default) |
+| `repo_path` | string | no       | Path to the repository (defaults to current) |
+
+**Example output:**
+```json
+{
+  "symbol": "AuthRepository",
+  "definitions": [{ "symbol": "AuthRepository", "path": "data/AuthRepository.kt", "kind": "class", "module": ":data" }],
+  "forward": [{ "symbol": "ApiService", "path": "api/ApiService.kt", "kind": "api_interface", "module": ":api" }],
+  "reverse": [{ "symbol": "LoginViewModel", "path": "feature/auth/LoginViewModel.kt", "kind": "viewmodel", "module": ":feature:auth" }]
+}
+```
+
 ### scrooge_statistics
 
 Usage and token savings metrics. Shows how much Scrooge saves by comparing compressed responses to raw content costs.
@@ -148,6 +194,35 @@ Sources: lexical 30% | vector 25% | both 45%
 | Variable | Description |
 |----------|-------------|
 | `SCROOGE_MODEL` | AI model identifier (e.g., `claude-opus-4-6`). Recorded in telemetry for per-model usage breakdown. |
+
+## Execution-Phase Hooks
+
+Scrooge can automatically inject project patterns before Write/Edit operations, so the agent writes code matching existing conventions without manual tool calls.
+
+### Claude Code (PreToolUse)
+
+Add to your project's `.claude/settings.json`:
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [{
+      "matcher": "Write|Edit",
+      "hooks": [{
+        "type": "command",
+        "command": "node /absolute/path/to/scrooge/bin/scrooge-hook.mjs",
+        "timeout": 3
+      }]
+    }]
+  }
+}
+```
+
+The hook reads the tool invocation from stdin, checks if the target file is a supported language (`.kt`, `.ts`, `.tsx`, `.dart`, `.py`), and injects project patterns as `additionalContext`. Timeout is 1.5s with silent failure.
+
+### pi.dev (tool_call event)
+
+The pi.dev extension automatically registers a `tool_call` hook that intercepts `write`/`edit` operations on supported file types. No additional configuration needed — it activates when the extension is installed.
 
 ## Architecture
 

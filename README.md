@@ -79,9 +79,12 @@
 - **`scrooge_search`** — Hybrid code search combining FTS5 lexical and sqlite-vec vector search with Reciprocal Rank Fusion
 - **`scrooge_map`** — Repository map with directory tree and hierarchical summaries at repo, module, or file level
 - **`scrooge_lookup`** — Symbol lookup: find definitions and all usages across the codebase
+- **`scrooge_context`** — Project patterns for a chunk kind: common annotations, tags, imports, and example sketches
+- **`scrooge_deps`** — Compact dependency graph: forward (what a symbol uses) and reverse (who uses it)
 - **`scrooge_reindex`** — Trigger full or incremental indexing of a repository
 - **`scrooge_status`** — Check index freshness: last indexed commit, total chunks, staleness
 - **`scrooge_statistics`** — Usage metrics and token savings breakdown over configurable time periods
+- **Execution hooks** — Automatic context injection before Write/Edit via Claude Code PreToolUse hook or pi.dev tool_call event
 - **Multi-channel** — Shared API layer supports Claude Code (MCP) and pi.dev (extension) with per-channel telemetry
 
 ## Prerequisites
@@ -244,6 +247,52 @@ Get information about the current index state.
 |-----------|------|----------|---------|-------------|
 | `repo_path` | string | no | cwd | Path to the repository |
 
+### scrooge_context
+
+Get project patterns for a given chunk kind — so the agent writes code matching existing conventions.
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `kind` | string | yes | — | Chunk kind (e.g. `"viewmodel"`, `"composable"`, `"dao"`) |
+| `module` | string | no | — | Filter to a specific module |
+| `repo_path` | string | no | cwd | Path to the repository |
+
+**Example response:**
+
+```json
+{
+  "kind": "viewmodel",
+  "sampleCount": 5,
+  "commonAnnotations": ["@HiltViewModel", "@Inject"],
+  "commonTags": ["hilt", "viewmodel", "coroutine"],
+  "commonImports": ["StateFlow", "MutableStateFlow", "viewModelScope"],
+  "exampleSketches": [
+    { "path": "feature/auth/LoginViewModel.kt", "sketch": "class LoginViewModel @Inject constructor(...)" }
+  ]
+}
+```
+
+### scrooge_deps
+
+Compact dependency graph for refactoring decisions: who a symbol depends on and who depends on it.
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `symbol` | string | yes | — | Symbol name (e.g. `"AuthRepository"`) |
+| `direction` | string | no | `"both"` | `"forward"`, `"reverse"`, or `"both"` |
+| `repo_path` | string | no | cwd | Path to the repository |
+
+**Example response:**
+
+```json
+{
+  "symbol": "AuthRepository",
+  "definitions": [{ "symbol": "AuthRepository", "path": "data/AuthRepository.kt", "kind": "class", "module": ":data" }],
+  "forward": [{ "symbol": "ApiService", "path": "api/ApiService.kt", "kind": "api_interface", "module": ":api" }],
+  "reverse": [{ "symbol": "LoginViewModel", "path": "feature/auth/LoginViewModel.kt", "kind": "viewmodel", "module": ":feature:auth" }]
+}
+```
+
 ### scrooge_statistics
 
 Usage and token savings metrics.
@@ -287,6 +336,35 @@ Sources: lexical 30% | vector 25% | both 45%
 |----------|-------------|
 | `SCROOGE_MODEL` | AI model identifier (e.g., `claude-opus-4-6`). Recorded in telemetry for per-model usage breakdown in `scrooge_statistics`. |
 
+## Execution-Phase Hooks
+
+Scrooge can automatically inject project patterns before Write/Edit operations, so the agent writes code matching existing conventions without manual tool calls.
+
+### Claude Code (PreToolUse)
+
+Add to your project's `.claude/settings.json`:
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [{
+      "matcher": "Write|Edit",
+      "hooks": [{
+        "type": "command",
+        "command": "node /absolute/path/to/scrooge/bin/scrooge-hook.mjs",
+        "timeout": 3
+      }]
+    }]
+  }
+}
+```
+
+The hook reads the tool invocation from stdin, checks if the target file is a supported language (`.kt`, `.ts`, `.tsx`, `.dart`, `.py`), and returns project patterns as `additionalContext`. Timeout is 1.5s with silent failure — it never blocks your workflow.
+
+### pi.dev (automatic)
+
+The pi.dev extension automatically intercepts `write`/`edit` operations on supported file types via the `tool_call` event. No additional configuration needed — install the extension and it activates automatically.
+
 ## Architecture
 
 ```
@@ -298,6 +376,8 @@ src/
 │   ├── search.ts         # search() — orchestrates hybrid search + telemetry
 │   ├── lookup.ts         # lookup() — symbol definitions + usages + telemetry
 │   ├── map.ts            # map() — repo tree + summaries + telemetry
+│   ├── context.ts        # context() — project pattern aggregation + telemetry
+│   ├── deps.ts           # deps() — dependency graph extraction + telemetry
 │   ├── reindex.ts        # reindex() — pipeline trigger + telemetry
 │   ├── status.ts         # status() — index freshness check + telemetry
 │   └── statistics.ts     # statistics() + buildStatisticsReport()

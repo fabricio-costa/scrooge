@@ -144,3 +144,32 @@ export interface StatisticsParams {
 export interface StatisticsResponse {
   report: string;
 }
+
+// --- Export ---
+
+export interface ExportParams {
+  period?: "today" | "week" | "month" | "all";
+  tool?: string;
+  format?: "jsonl" | "csv";
+  anonymize?: boolean;
+  limit?: number;
+}
+
+export interface ExportRecord {
+  id: number;
+  tool: string;
+  repo: string;
+  called_at: string;
+  duration_ms: number;
+  tokens_sent: number;
+  tokens_raw: number;
+  channel: string;
+  model: string | null;
+  [key: string]: unknown;
+}
+
+export interface ExportResponse {
+  records: ExportRecord[];
+  format: "jsonl" | "csv";
+  count: number;
+}

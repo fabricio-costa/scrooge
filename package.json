@@ -19,6 +19,8 @@
     "test:watch": "vitest",
     "lint": "eslint src/ test/",
     "typecheck": "tsc --noEmit",
+    "export": "node bin/export.mjs",
+    "eval": "node --import tsx/esm bin/eval.mjs",
     "setup": "node bin/setup.mjs",
     "uninstall": "node bin/uninstall.mjs"
   },

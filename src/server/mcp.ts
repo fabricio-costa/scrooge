@@ -8,6 +8,7 @@ import { registerReindexTool } from "./tools/reindex.js";
 import { registerStatisticsTool } from "./tools/statistics.js";
 import { registerContextTool } from "./tools/context.js";
 import { registerDepsTool } from "./tools/deps.js";
+import { registerExportTool } from "./tools/export.js";
 
 export function createServer(): McpServer {
   const server = new McpServer({
@@ -23,6 +24,7 @@ export function createServer(): McpServer {
   registerStatisticsTool(server);
   registerContextTool(server);
   registerDepsTool(server);
+  registerExportTool(server);
 
   return server;
 }

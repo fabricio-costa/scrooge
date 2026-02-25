@@ -144,7 +144,7 @@ export function buildStatisticsReport(
   return lines.join("\n");
 }
 
-function getDateFilter(period: Period): string | null {
+export function getDateFilter(period: Period): string | null {
   if (period === "all") return null;
   const now = new Date();
   switch (period) {

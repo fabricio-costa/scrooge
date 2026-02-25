@@ -129,19 +129,67 @@ if (hasClaude) {
   log("skip", "PreToolUse hook: skipped (claude CLI not found)");
 }
 
-// ── 5. Generate project .claude/settings.json ─────────────────────────────────
+// ── 5. Configure PostToolUse hook (agent coverage tracking, user scope) ──────
+
+if (hasClaude) {
+  try {
+    const userClaudeDir = join(homedir(), ".claude");
+    const userSettingsPath = join(userClaudeDir, "settings.json");
+
+    let settings = {};
+    if (existsSync(userSettingsPath)) {
+      try {
+        settings = JSON.parse(readFileSync(userSettingsPath, "utf-8"));
+      } catch {
+        settings = {};
+      }
+    }
+
+    if (!settings.hooks) settings.hooks = {};
+    if (!Array.isArray(settings.hooks.PostToolUse)) settings.hooks.PostToolUse = [];
+
+    // Remove any existing scrooge-observe entries
+    settings.hooks.PostToolUse = settings.hooks.PostToolUse.filter((entry) => {
+      const hooks = entry.hooks || [];
+      return !hooks.some((h) => typeof h.command === "string" && h.command.includes("scrooge-observe.mjs"));
+    });
+
+    // Append fresh entry (empty matcher = match all tools)
+    const observeCommand = `node ${join(root, "bin", "scrooge-observe.mjs")}`;
+    settings.hooks.PostToolUse.push({
+      matcher: "",
+      hooks: [{ type: "command", command: observeCommand, timeout: 3 }],
+    });
+
+    writeFileSync(userSettingsPath, JSON.stringify(settings, null, 2) + "\n");
+    log("ok", "PostToolUse hook configured (~/.claude/settings.json)");
+  } catch (err) {
+    log("fail", `PostToolUse hook configuration failed: ${err.message}`);
+  }
+} else {
+  log("skip", "PostToolUse hook: skipped (claude CLI not found)");
+}
+
+// ── 6. Generate project .claude/settings.json ─────────────────────────────────
 
 try {
   const projectClaudeDir = join(root, ".claude");
   mkdirSync(projectClaudeDir, { recursive: true });
 
   const hookCommand = `node ${join(root, "bin", "scrooge-hook.mjs")}`;
+  const observeCommand = `node ${join(root, "bin", "scrooge-observe.mjs")}`;
   const projectSettings = {
     hooks: {
       PreToolUse: [
         {
           matcher: "Write|Edit",
           hooks: [{ type: "command", command: hookCommand, timeout: 3 }],
+        },
+      ],
+      PostToolUse: [
+        {
+          matcher: "",
+          hooks: [{ type: "command", command: observeCommand, timeout: 3 }],
         },
       ],
     },
@@ -153,7 +201,7 @@ try {
   log("fail", `Project settings failed: ${err.message}`);
 }
 
-// ── 6. Register pi.dev extension (optional) ───────────────────────────────────
+// ── 7. Register pi.dev extension (optional) ───────────────────────────────────
 
 const hasPi = which("pi");
 

@@ -1,5 +1,6 @@
-import { join } from "node:path";
+import { join, dirname } from "node:path";
 import { existsSync, mkdirSync, chmodSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 
 export interface ScroogeConfig {
   dbPath: string;
@@ -22,7 +23,7 @@ const DEFAULT_CONFIG: ScroogeConfig = {
   rrfK: 60,
   embeddingModel: "Xenova/all-MiniLM-L6-v2",
   embeddingDims: 384,
-  modelPath: join(import.meta.dirname ?? __dirname, "..", "..", "models"),
+  modelPath: join(dirname(fileURLToPath(import.meta.url)), "..", "..", "models"),
 };
 
 let _config: ScroogeConfig | null = null;

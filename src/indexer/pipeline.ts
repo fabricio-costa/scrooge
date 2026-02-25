@@ -34,6 +34,7 @@ const chunkers: ChunkerPlugin[] = [
 ];
 
 const MAX_FILE_SIZE = 1_000_000; // 1MB
+const MAX_FILES = 100_000;
 
 export interface IndexStats {
   filesProcessed: number;
@@ -105,6 +106,10 @@ export async function runPipeline(options: IndexOptions): Promise<IndexStats> {
       chunksRemoved = existingIds.length;
     }
     filesToProcess = filterFiles(getTrackedFiles(repoPath));
+  }
+
+  if (filesToProcess.length > MAX_FILES) {
+    throw new Error(`Repository has ${filesToProcess.length} files, exceeds limit of ${MAX_FILES}`);
   }
 
   log(`${filesToProcess.length} files to process`);

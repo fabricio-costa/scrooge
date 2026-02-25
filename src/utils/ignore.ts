@@ -78,6 +78,8 @@ const SENSITIVE_FILES = new Set([
   "id_ed25519",
   "id_ecdsa",
   "id_dsa",
+  "authorized_keys",
+  "known_hosts",
 ]);
 
 const SENSITIVE_EXTENSIONS = new Set([
@@ -87,6 +89,8 @@ const SENSITIVE_EXTENSIONS = new Set([
   ".key",
   ".crt",
   ".cert",
+  ".secret",
+  ".secrets",
 ]);
 
 export function shouldIgnore(filePath: string): boolean {
@@ -107,6 +111,7 @@ export function shouldIgnore(filePath: string): boolean {
 
   // Check sensitive files (secrets, credentials, keys)
   if (SENSITIVE_FILES.has(fileName)) return true;
+  if (fileName.startsWith(".env")) return true;
   if (SENSITIVE_EXTENSIONS.has(ext)) return true;
 
   return false;

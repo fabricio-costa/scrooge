@@ -44,9 +44,9 @@ async function main() {
 
   const record = JSON.stringify({
     t: new Date().toISOString(),
-    tool: toolName,
-    repo: payload.cwd ?? "",
-    sid: payload.session_id ?? "",
+    tool: String(toolName).slice(0, 200),
+    repo: String(payload.cwd ?? "").slice(0, 500),
+    sid: String(payload.session_id ?? "").slice(0, 100),
   });
 
   appendFileSync(join(scroogeDir, "observed.jsonl"), record + "\n");

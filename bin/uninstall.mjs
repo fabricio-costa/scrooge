@@ -9,7 +9,7 @@
  * Usage: npm run uninstall
  */
 
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -24,7 +24,7 @@ function log(symbol, message) {
 
 function which(cmd) {
   try {
-    execSync(`which ${cmd}`, { stdio: "pipe" });
+    execFileSync("which", [cmd], { stdio: "pipe" });
     return true;
   } catch {
     return false;
@@ -38,7 +38,7 @@ console.log("─────────────────\n");
 
 if (which("claude")) {
   try {
-    execSync("claude mcp remove scrooge", { stdio: "pipe" });
+    execFileSync("claude", ["mcp", "remove", "scrooge"], { stdio: "pipe" });
     log("ok", "MCP server removed");
   } catch {
     log("skip", "MCP server: not registered");
@@ -105,7 +105,7 @@ if (existsSync(userSettingsPath)) {
 if (which("pi")) {
   try {
     const extensionPath = join(root, "packages", "pi-extension");
-    execSync(`pi remove ${extensionPath}`, { stdio: "pipe" });
+    execFileSync("pi", ["remove", extensionPath], { stdio: "pipe" });
     log("ok", "pi.dev extension removed");
   } catch {
     log("skip", "pi.dev extension: not installed");

@@ -9,7 +9,7 @@
  * Usage: npm run setup
  */
 
-import { execFileSync, execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -26,7 +26,7 @@ function log(symbol, message) {
 
 function which(cmd) {
   try {
-    execSync(`which ${cmd}`, { stdio: "pipe" });
+    execFileSync("which", [cmd], { stdio: "pipe" });
     return true;
   } catch {
     return false;
@@ -67,13 +67,13 @@ if (hasClaude) {
   try {
     // Remove existing registration (idempotent)
     try {
-      execSync("claude mcp remove scrooge", { stdio: "pipe" });
+      execFileSync("claude", ["mcp", "remove", "scrooge"], { stdio: "pipe" });
     } catch {
       // Not registered yet — fine
     }
 
     const launcherPath = join(root, "bin", "scrooge-mcp.mjs");
-    execSync(`claude mcp add -s user scrooge -- node ${launcherPath}`, { stdio: "pipe" });
+    execFileSync("claude", ["mcp", "add", "-s", "user", "scrooge", "--", "node", launcherPath], { stdio: "pipe" });
     log("ok", "MCP server registered (user scope)");
   } catch (err) {
     log("fail", `MCP registration failed: ${err.message}`);
@@ -208,7 +208,7 @@ const hasPi = which("pi");
 if (hasPi) {
   try {
     const extensionPath = join(root, "packages", "pi-extension");
-    execSync(`pi install ${extensionPath}`, { stdio: "pipe" });
+    execFileSync("pi", ["install", extensionPath], { stdio: "pipe" });
     log("ok", "pi.dev extension installed");
   } catch (err) {
     log("fail", `pi.dev extension failed: ${err.message}`);

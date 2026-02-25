@@ -1,9 +1,27 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { openDb, recordToolCall, type ToolCallRecord } from "../src/storage/db.js";
-import { buildStatisticsReport } from "../src/api/statistics.js";
-import type Database from "better-sqlite3";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { mkdirSync, writeFileSync, rmSync, existsSync } from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 
-let db: Database.Database;
+// Module-level variable for homedir mock — defaults to nonexistent path
+// so formatCoverageSection returns null for all non-coverage tests
+let _testHomedir = "/nonexistent-scrooge-test-dir";
+
+vi.mock("node:os", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:os")>();
+  return {
+    ...actual,
+    homedir: () => _testHomedir,
+  };
+});
+
+// Import after mock setup
+const { openDb, recordToolCall } = await import("../src/storage/db.js");
+type ToolCallRecord = import("../src/storage/db.js").ToolCallRecord;
+const { buildStatisticsReport } = await import("../src/api/statistics.js");
+type Database = import("better-sqlite3").Database;
+
+let db: Database;
 
 beforeEach(() => {
   db = openDb(":memory:");
@@ -269,6 +287,66 @@ describe("buildStatisticsReport", () => {
     const report = buildStatisticsReport(db, "/test/repo", "all");
 
     expect(report).not.toContain("Models");
+  });
+});
+
+describe("buildStatisticsReport — Agent Coverage", () => {
+  let testDir: string;
+  let scroogeDir: string;
+  let observedPath: string;
+
+  beforeEach(() => {
+    testDir = join(tmpdir(), `scrooge-stat-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    scroogeDir = join(testDir, ".scrooge");
+    observedPath = join(scroogeDir, "observed.jsonl");
+    mkdirSync(scroogeDir, { recursive: true });
+
+    _testHomedir = testDir;
+  });
+
+  afterEach(() => {
+    _testHomedir = "/nonexistent-scrooge-test-dir";
+    if (existsSync(testDir)) {
+      rmSync(testDir, { recursive: true, force: true });
+    }
+  });
+
+  it("should include Agent Coverage section when observed data exists", () => {
+    // Insert some scrooge tool calls so the report isn't empty
+    recordToolCall(db, {
+      tool: "search",
+      repo_path: "/test/repo",
+      duration_ms: 100,
+      tokens_sent: 500,
+      tokens_raw: 3000,
+    });
+
+    // Write observed data for the same repo
+    const records = [
+      { t: "2026-02-25T10:00:00Z", tool: "mcp__scrooge__scrooge_search", repo: "/test/repo", sid: "s1" },
+      { t: "2026-02-25T10:01:00Z", tool: "mcp__scrooge__scrooge_lookup", repo: "/test/repo", sid: "s1" },
+      { t: "2026-02-25T10:02:00Z", tool: "Read", repo: "/test/repo", sid: "s1" },
+    ];
+    writeFileSync(observedPath, records.map((r) => JSON.stringify(r)).join("\n") + "\n");
+
+    const report = buildStatisticsReport(db, "/test/repo", "all");
+    expect(report).toContain("### Agent Coverage");
+    expect(report).toContain("Scrooge exploration: 2 calls");
+    expect(report).toContain("Native exploration:  1 calls");
+    expect(report).toContain("Coverage: 66.7%");
+  });
+
+  it("should omit Agent Coverage when no observed data exists", () => {
+    recordToolCall(db, {
+      tool: "search",
+      repo_path: "/test/repo",
+      duration_ms: 100,
+      tokens_sent: 500,
+      tokens_raw: 3000,
+    });
+
+    const report = buildStatisticsReport(db, "/test/repo", "all");
+    expect(report).not.toContain("Agent Coverage");
   });
 });
 

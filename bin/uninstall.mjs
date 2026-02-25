@@ -47,24 +47,24 @@ if (which("claude")) {
   log("skip", "MCP server: skipped (claude CLI not found)");
 }
 
-// ── 2. Remove scrooge hook from ~/.claude/settings.json ──────────────────────
+// ── 2. Remove scrooge hooks from ~/.claude/settings.json ─────────────────────
 
 const userSettingsPath = join(homedir(), ".claude", "settings.json");
 
 if (existsSync(userSettingsPath)) {
   try {
     const settings = JSON.parse(readFileSync(userSettingsPath, "utf-8"));
+    let modified = false;
 
+    // Remove PreToolUse hook
     if (settings.hooks && Array.isArray(settings.hooks.PreToolUse)) {
       const before = settings.hooks.PreToolUse.length;
       settings.hooks.PreToolUse = settings.hooks.PreToolUse.filter((entry) => {
         const hooks = entry.hooks || [];
         return !hooks.some((h) => typeof h.command === "string" && h.command.includes("scrooge-hook.mjs"));
       });
-      const after = settings.hooks.PreToolUse.length;
-
-      if (before !== after) {
-        writeFileSync(userSettingsPath, JSON.stringify(settings, null, 2) + "\n");
+      if (before !== settings.hooks.PreToolUse.length) {
+        modified = true;
         log("ok", "PreToolUse hook removed (~/.claude/settings.json)");
       } else {
         log("skip", "PreToolUse hook: not found in settings");
@@ -72,11 +72,32 @@ if (existsSync(userSettingsPath)) {
     } else {
       log("skip", "PreToolUse hook: no hooks configured");
     }
+
+    // Remove PostToolUse hook
+    if (settings.hooks && Array.isArray(settings.hooks.PostToolUse)) {
+      const before = settings.hooks.PostToolUse.length;
+      settings.hooks.PostToolUse = settings.hooks.PostToolUse.filter((entry) => {
+        const hooks = entry.hooks || [];
+        return !hooks.some((h) => typeof h.command === "string" && h.command.includes("scrooge-observe.mjs"));
+      });
+      if (before !== settings.hooks.PostToolUse.length) {
+        modified = true;
+        log("ok", "PostToolUse hook removed (~/.claude/settings.json)");
+      } else {
+        log("skip", "PostToolUse hook: not found in settings");
+      }
+    } else {
+      log("skip", "PostToolUse hook: no hooks configured");
+    }
+
+    if (modified) {
+      writeFileSync(userSettingsPath, JSON.stringify(settings, null, 2) + "\n");
+    }
   } catch (err) {
     log("fail", `Hook removal failed: ${err.message}`);
   }
 } else {
-  log("skip", "PreToolUse hook: ~/.claude/settings.json not found");
+  log("skip", "Hooks: ~/.claude/settings.json not found");
 }
 
 // ── 3. Remove pi.dev extension ───────────────────────────────────────────────
@@ -106,6 +127,20 @@ if (existsSync(projectSettingsPath)) {
   }
 } else {
   log("skip", "Project settings: not found");
+}
+
+// ── 5. Remove observed.jsonl ─────────────────────────────────────────────────
+
+const observedPath = join(homedir(), ".scrooge", "observed.jsonl");
+if (existsSync(observedPath)) {
+  try {
+    unlinkSync(observedPath);
+    log("ok", "Observed data removed (~/.scrooge/observed.jsonl)");
+  } catch (err) {
+    log("fail", `Observed data removal failed: ${err.message}`);
+  }
+} else {
+  log("skip", "Observed data: not found");
 }
 
 // ── Summary ──────────────────────────────────────────────────────────────────

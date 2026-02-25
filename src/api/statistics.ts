@@ -1,5 +1,6 @@
 import { openDb } from "../storage/db.js";
 import { getConfig } from "../utils/config.js";
+import { formatCoverageSection } from "../utils/observed.js";
 import { validateRepoPath } from "../utils/path-validation.js";
 import type Database from "better-sqlite3";
 import type { ApiContext, StatisticsParams, StatisticsResponse } from "./types.js";
@@ -138,6 +139,14 @@ export function buildStatisticsReport(
     lines.push(
       `Sources: lexical ${searchInsights.lexicalPct}% | vector ${searchInsights.vectorPct}% | both ${searchInsights.bothPct}%`,
     );
+    lines.push("");
+  }
+
+  // Agent Coverage (from observed.jsonl)
+  const coverageSection = formatCoverageSection(repoPath, dateFilter);
+  if (coverageSection) {
+    lines.push("### Agent Coverage");
+    lines.push(coverageSection);
     lines.push("");
   }
 

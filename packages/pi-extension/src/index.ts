@@ -13,12 +13,31 @@
 
 import { Type } from "@sinclair/typebox";
 import { execSync } from "node:child_process";
+import { appendFileSync, mkdirSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import { search, lookup, map, reindex, status, statistics, context, deps } from "scrooge/api";
 import type { Channel } from "scrooge/api";
 
 const CHANNEL: Channel = "pi";
 
 const SUPPORTED_EXTENSIONS = ["kt", "ts", "tsx", "dart", "py"];
+
+function observeToolCall(toolName: string): void {
+  try {
+    const scroogeDir = join(homedir(), ".scrooge");
+    mkdirSync(scroogeDir, { recursive: true });
+    const record = JSON.stringify({
+      t: new Date().toISOString(),
+      tool: `pi:${toolName}`,
+      repo: process.cwd(),
+      sid: "",
+    });
+    appendFileSync(join(scroogeDir, "observed.jsonl"), record + "\n");
+  } catch {
+    /* silent */
+  }
+}
 
 // Minimal type for pi.dev's ExtensionAPI — avoids hard dep on @mariozechner/pi-coding-agent
 interface PiExtensionAPI {
@@ -227,6 +246,8 @@ export default function (pi: PiExtensionAPI): void {
   // --- Automatic context injection hook ---
   pi.on("tool_call", async (event) => {
     const toolName = event.toolName as string | undefined;
+    if (toolName) observeToolCall(toolName);
+
     if (toolName !== "write" && toolName !== "edit") return;
 
     const input = event.input as Record<string, unknown> | undefined;

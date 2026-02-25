@@ -98,6 +98,43 @@ export interface StatusResponse {
   freshness?: string;
 }
 
+// --- Context ---
+
+export interface ContextParams {
+  kind: string;
+  module?: string;
+}
+
+export interface ContextResponse {
+  kind: string;
+  sampleCount: number;
+  commonAnnotations: string[];
+  commonTags: string[];
+  commonImports: string[];
+  exampleSketches: Array<{ path: string; sketch: string }>;
+}
+
+// --- Deps ---
+
+export interface DepsParams {
+  symbol: string;
+  direction?: "forward" | "reverse" | "both";
+}
+
+export interface DepEntry {
+  symbol: string;
+  path: string;
+  kind: string;
+  module: string | null;
+}
+
+export interface DepsResponse {
+  symbol: string;
+  definitions: DepEntry[];
+  forward: DepEntry[];
+  reverse: DepEntry[];
+}
+
 // --- Statistics ---
 
 export interface StatisticsParams {

@@ -3,8 +3,8 @@
 /**
  * Scrooge Uninstall Script
  *
- * Removes MCP registration, PreToolUse hook, pi.dev extension,
- * and project settings. Does NOT delete ~/.scrooge/scrooge.db (user data).
+ * Removes MCP registration, all hooks, pi.dev extension + AGENTS.md section,
+ * project settings, and generated files. Does NOT delete ~/.scrooge/scrooge.db (user data).
  *
  * Usage: npm run uninstall
  */
@@ -47,7 +47,7 @@ if (which("claude")) {
   log("skip", "MCP server: skipped (claude CLI not found)");
 }
 
-// ── 2. Remove scrooge hooks from ~/.claude/settings.json ─────────────────────
+// ── 2. Remove all scrooge hooks from ~/.claude/settings.json ────────────────
 
 const userSettingsPath = join(homedir(), ".claude", "settings.json");
 
@@ -56,38 +56,48 @@ if (existsSync(userSettingsPath)) {
     const settings = JSON.parse(readFileSync(userSettingsPath, "utf-8"));
     let modified = false;
 
-    // Remove PreToolUse hook
+    // Helper: filter out scrooge entries from a hook array
+    const filterScrooge = (arr, pattern) =>
+      (arr || []).filter((entry) => {
+        const hooks = entry.hooks || [];
+        return !hooks.some((h) => typeof h.command === "string" && h.command.includes(pattern));
+      });
+
+    // Remove PreToolUse hooks (context + nudge)
     if (settings.hooks && Array.isArray(settings.hooks.PreToolUse)) {
       const before = settings.hooks.PreToolUse.length;
-      settings.hooks.PreToolUse = settings.hooks.PreToolUse.filter((entry) => {
-        const hooks = entry.hooks || [];
-        return !hooks.some((h) => typeof h.command === "string" && h.command.includes("scrooge-hook.mjs"));
-      });
+      settings.hooks.PreToolUse = filterScrooge(settings.hooks.PreToolUse, "scrooge-hook.mjs");
+      settings.hooks.PreToolUse = filterScrooge(settings.hooks.PreToolUse, "scrooge-nudge.mjs");
       if (before !== settings.hooks.PreToolUse.length) {
         modified = true;
-        log("ok", "PreToolUse hook removed (~/.claude/settings.json)");
+        log("ok", "PreToolUse hooks removed");
       } else {
-        log("skip", "PreToolUse hook: not found in settings");
+        log("skip", "PreToolUse hooks: not found");
       }
-    } else {
-      log("skip", "PreToolUse hook: no hooks configured");
     }
 
-    // Remove PostToolUse hook
+    // Remove PostToolUse hook (observability)
     if (settings.hooks && Array.isArray(settings.hooks.PostToolUse)) {
       const before = settings.hooks.PostToolUse.length;
-      settings.hooks.PostToolUse = settings.hooks.PostToolUse.filter((entry) => {
-        const hooks = entry.hooks || [];
-        return !hooks.some((h) => typeof h.command === "string" && h.command.includes("scrooge-observe.mjs"));
-      });
+      settings.hooks.PostToolUse = filterScrooge(settings.hooks.PostToolUse, "scrooge-observe.mjs");
       if (before !== settings.hooks.PostToolUse.length) {
         modified = true;
-        log("ok", "PostToolUse hook removed (~/.claude/settings.json)");
+        log("ok", "PostToolUse hook removed");
       } else {
-        log("skip", "PostToolUse hook: not found in settings");
+        log("skip", "PostToolUse hook: not found");
       }
-    } else {
-      log("skip", "PostToolUse hook: no hooks configured");
+    }
+
+    // Remove SessionStart hook (onboarding)
+    if (settings.hooks && Array.isArray(settings.hooks.SessionStart)) {
+      const before = settings.hooks.SessionStart.length;
+      settings.hooks.SessionStart = filterScrooge(settings.hooks.SessionStart, "scrooge-session.mjs");
+      if (before !== settings.hooks.SessionStart.length) {
+        modified = true;
+        log("ok", "SessionStart hook removed");
+      } else {
+        log("skip", "SessionStart hook: not found");
+      }
     }
 
     if (modified) {
@@ -114,7 +124,44 @@ if (which("pi")) {
   log("skip", "pi.dev: skipped (pi CLI not found)");
 }
 
-// ── 4. Remove project .claude/settings.json ──────────────────────────────────
+// ── 4. Remove Scrooge section from pi.dev AGENTS.md ─────────────────────────
+
+{
+  const MARKER_START = "<!-- scrooge:start v1 -->";
+  const MARKER_END = "<!-- scrooge:end -->";
+  const agentsMdPath = join(homedir(), ".pi", "agent", "AGENTS.md");
+
+  if (existsSync(agentsMdPath)) {
+    try {
+      const content = readFileSync(agentsMdPath, "utf-8");
+      const startIdx = content.indexOf(MARKER_START);
+      const endIdx = content.indexOf(MARKER_END);
+
+      if (startIdx !== -1 && endIdx !== -1) {
+        // Backup before modification
+        writeFileSync(`${agentsMdPath}.scrooge-bak`, content);
+
+        let before = content.slice(0, startIdx);
+        let after = content.slice(endIdx + MARKER_END.length);
+
+        // Clean up extra newlines at the boundary
+        before = before.replace(/\n+$/, before.trim() ? "\n" : "");
+        after = after.replace(/^\n+/, after.trim() ? "\n" : "");
+
+        writeFileSync(agentsMdPath, before + after);
+        log("ok", "Scrooge section removed from Pi.dev AGENTS.md");
+      } else {
+        log("skip", "Pi.dev AGENTS.md: no Scrooge section found");
+      }
+    } catch (err) {
+      log("fail", `Pi.dev AGENTS.md cleanup failed: ${err.message}`);
+    }
+  } else {
+    log("skip", "Pi.dev AGENTS.md: not found");
+  }
+}
+
+// ── 5. Remove project .claude/settings.json ──────────────────────────────────
 
 const projectSettingsPath = join(root, ".claude", "settings.json");
 
@@ -129,18 +176,24 @@ if (existsSync(projectSettingsPath)) {
   log("skip", "Project settings: not found");
 }
 
-// ── 5. Remove observed.jsonl ─────────────────────────────────────────────────
+// ── 6. Remove generated files ───────────────────────────────────────────────
 
-const observedPath = join(homedir(), ".scrooge", "observed.jsonl");
-if (existsSync(observedPath)) {
-  try {
-    unlinkSync(observedPath);
-    log("ok", "Observed data removed (~/.scrooge/observed.jsonl)");
-  } catch (err) {
-    log("fail", `Observed data removal failed: ${err.message}`);
+const generatedFiles = [
+  { path: join(homedir(), ".scrooge", "observed.jsonl"), label: "Observed data" },
+  { path: join(homedir(), ".scrooge", "agent-instructions.md"), label: "Agent instructions template" },
+];
+
+for (const { path, label } of generatedFiles) {
+  if (existsSync(path)) {
+    try {
+      unlinkSync(path);
+      log("ok", `${label} removed`);
+    } catch (err) {
+      log("fail", `${label} removal failed: ${err.message}`);
+    }
+  } else {
+    log("skip", `${label}: not found`);
   }
-} else {
-  log("skip", "Observed data: not found");
 }
 
 // ── Summary ──────────────────────────────────────────────────────────────────

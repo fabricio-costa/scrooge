@@ -110,6 +110,12 @@ npm run setup
 
 `npm run setup` builds the project, registers the MCP server with Claude Code (user scope), configures hooks (SessionStart onboarding, PreToolUse pattern injection + exploration nudges, PostToolUse observability), manages pi.dev AGENTS.md, and optionally installs the pi.dev extension.
 
+To add Scrooge instructions to any project's CLAUDE.md manually:
+
+```bash
+cat ~/.scrooge/agent-instructions.md
+```
+
 To uninstall: `npm run uninstall`
 
 <details>
@@ -391,6 +397,18 @@ The pi.dev extension handles all hooks automatically via the `tool_call` event �
 ## Architecture
 
 ```
+bin/
+├── scrooge-mcp.mjs       # MCP launcher (auto-rebuilds native modules if needed)
+├── scrooge-session.mjs   # SessionStart hook — injects index summary + directives
+├── scrooge-hook.mjs      # PreToolUse hook — injects project patterns for Write/Edit
+├── scrooge-nudge.mjs     # PreToolUse hook — suggests Scrooge alternatives for Read/Grep/Glob
+├── scrooge-observe.mjs   # PostToolUse hook — records tool calls for coverage metrics
+├── setup.mjs             # One-command setup: build, register, configure hooks
+└── uninstall.mjs         # Clean removal of all registrations and hooks
+templates/
+└── agent-instructions.md # Reusable Scrooge tool preference template
+packages/
+└── pi-extension/         # pi.dev extension: tools + hooks via tool_call event
 src/
 ├── index.ts              # Entry point — starts MCP server
 ├── api/                  # Transport-agnostic API layer (shared by MCP + pi.dev)

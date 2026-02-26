@@ -84,7 +84,7 @@
 - **`scrooge_reindex`** — Trigger full or incremental indexing of a repository
 - **`scrooge_status`** — Check index freshness: last indexed commit, total chunks, staleness
 - **`scrooge_statistics`** — Usage metrics and token savings breakdown over configurable time periods
-- **Execution hooks** — Automatic context injection before Write/Edit via Claude Code PreToolUse hook or pi.dev tool_call event
+- **Execution hooks** — Automatic context injection before Write/Edit, exploration nudges for Read/Grep/Glob, and session onboarding with index summary
 - **Multi-channel** — Shared API layer supports Claude Code (MCP) and pi.dev (extension) with per-channel telemetry
 
 ## Prerequisites
@@ -108,7 +108,7 @@ npm install
 npm run setup
 ```
 
-`npm run setup` builds the project, registers the MCP server with Claude Code (user scope), configures the PreToolUse hook for automatic pattern injection, and optionally installs the pi.dev extension.
+`npm run setup` builds the project, registers the MCP server with Claude Code (user scope), configures hooks (SessionStart onboarding, PreToolUse pattern injection + exploration nudges, PostToolUse observability), manages pi.dev AGENTS.md, and optionally installs the pi.dev extension.
 
 To uninstall: `npm run uninstall`
 
@@ -340,37 +340,51 @@ Sources: lexical 30% | vector 25% | both 45%
 |----------|-------------|
 | `SCROOGE_MODEL` | AI model identifier (e.g., `claude-opus-4-6`). Recorded in telemetry for per-model usage breakdown in `scrooge_statistics`. |
 
-## Execution-Phase Hooks
+## Hooks
 
-Scrooge can automatically inject project patterns before Write/Edit operations, so the agent writes code matching existing conventions without manual tool calls. `npm run setup` configures hooks automatically.
+Scrooge registers several hooks to integrate seamlessly with agent workflows. `npm run setup` configures all hooks automatically.
+
+| Hook | Trigger | Purpose |
+|------|---------|---------|
+| **SessionStart** | Session begins | Injects index summary + tool preference directives for indexed repos |
+| **PreToolUse** (Write\|Edit) | Before file writes | Injects project patterns (annotations, imports, sketches) |
+| **PreToolUse** (Read\|Grep\|Glob) | Before exploration | Suggests Scrooge alternatives (rate-limited: 3/session) |
+| **PostToolUse** | After any tool call | Records tool usage to `~/.scrooge/observed.jsonl` for coverage metrics |
+
+All hooks return `{}` for non-indexed repos (zero overhead) and fail silently on timeout.
 
 <details>
-<summary>Manual hook configuration</summary>
-
-### Claude Code (PreToolUse)
+<summary>Manual hook configuration (Claude Code)</summary>
 
 Add to `~/.claude/settings.json` (user scope) or your project's `.claude/settings.json`:
 
 ```json
 {
   "hooks": {
-    "PreToolUse": [{
-      "matcher": "Write|Edit",
-      "hooks": [{
-        "type": "command",
-        "command": "node /absolute/path/to/scrooge/bin/scrooge-hook.mjs",
-        "timeout": 3
-      }]
+    "SessionStart": [{
+      "hooks": [{ "type": "command", "command": "node /path/to/scrooge/bin/scrooge-session.mjs", "timeout": 3 }]
+    }],
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [{ "type": "command", "command": "node /path/to/scrooge/bin/scrooge-hook.mjs", "timeout": 3 }]
+      },
+      {
+        "matcher": "Read|Grep|Glob",
+        "hooks": [{ "type": "command", "command": "node /path/to/scrooge/bin/scrooge-nudge.mjs", "timeout": 2 }]
+      }
+    ],
+    "PostToolUse": [{
+      "matcher": "",
+      "hooks": [{ "type": "command", "command": "node /path/to/scrooge/bin/scrooge-observe.mjs", "timeout": 3 }]
     }]
   }
 }
 ```
 
-The hook reads the tool invocation from stdin, checks if the target file is a supported language (`.kt`, `.ts`, `.tsx`, `.dart`, `.py`), and returns project patterns as `additionalContext`. Timeout is 1.5s with silent failure — it never blocks your workflow.
+### pi.dev
 
-### pi.dev (automatic)
-
-The pi.dev extension automatically intercepts `write`/`edit` operations on supported file types via the `tool_call` event. No additional configuration needed — install the extension and it activates automatically.
+The pi.dev extension handles all hooks automatically via the `tool_call` event — no additional configuration needed. During installation, `npm run setup` also appends Scrooge instructions to `~/.pi/agent/AGENTS.md` (with HTML markers for safe updates/removal).
 
 </details>
 

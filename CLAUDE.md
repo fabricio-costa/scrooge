@@ -181,19 +181,37 @@ Sources: lexical 30% | vector 25% | both 45%
 |----------|-------------|
 | `SCROOGE_MODEL` | AI model identifier (e.g., `claude-opus-4-6`). Recorded in telemetry for per-model usage breakdown. |
 
-## Execution-Phase Hooks
+## Hooks
 
-Scrooge can automatically inject project patterns before Write/Edit operations, so the agent writes code matching existing conventions without manual tool calls.
+Scrooge registers several hooks to integrate seamlessly with agent workflows. `npm run setup` configures all hooks automatically. For manual configuration, see the README.
 
-`npm run setup` configures hooks automatically. For manual configuration, see the README.
+### SessionStart — Onboarding
 
-### Claude Code (PreToolUse)
+On session start, injects a repository index summary (file/chunk counts, last indexed commit) and behavioral directives (prefer Scrooge tools over native Read/Grep/Glob). Returns `{}` for non-indexed repos (zero overhead).
 
-The hook reads the tool invocation from stdin, checks if the target file is a supported language (`.kt`, `.ts`, `.tsx`, `.dart`, `.py`), and injects project patterns as `additionalContext`. Timeout is 1.5s with silent failure.
+- **Claude Code**: `bin/scrooge-session.mjs` — lightweight, only imports `better-sqlite3` to query `index_meta`
+- **Pi.dev**: Instructions are appended to `~/.pi/agent/AGENTS.md` during installation (with HTML markers for safe updates)
 
-### pi.dev (tool_call event)
+### PreToolUse — Context Injection (Write|Edit)
 
-The pi.dev extension automatically registers a `tool_call` hook that intercepts `write`/`edit` operations on supported file types. No additional configuration needed — it activates when the extension is installed.
+Injects project patterns (annotations, imports, example sketches) before Write/Edit operations on supported file types (`.kt`, `.ts`, `.tsx`, `.dart`, `.py`).
+
+- **Claude Code**: `bin/scrooge-hook.mjs` — timeout 1.5s, silent failure
+- **Pi.dev**: `tool_call` event handler in the extension
+
+### PreToolUse — Nudge (Read|Grep|Glob)
+
+Suggests Scrooge alternatives when agents use native exploration tools on indexed repos. Rate-limited to 3 nudges per session to avoid being invasive.
+
+- **Claude Code**: `bin/scrooge-nudge.mjs` — lightweight (no Scrooge dist imports), rate-limited via temp file
+- **Pi.dev**: `tool_call` event handler with in-memory rate limiting
+
+### PostToolUse — Observability
+
+Records all tool calls to `~/.scrooge/observed.jsonl` for coverage metrics (what % of exploration used Scrooge vs native tools).
+
+- **Claude Code**: `bin/scrooge-observe.mjs`
+- **Pi.dev**: `observeToolCall()` in the extension
 
 ## Architecture
 

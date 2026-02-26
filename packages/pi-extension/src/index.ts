@@ -13,15 +13,70 @@
 
 import { Type } from "@sinclair/typebox";
 import { execSync } from "node:child_process";
-import { appendFileSync, mkdirSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { status as scroogeStatus } from "scrooge/api";
 import { search, lookup, map, reindex, status, statistics, context, deps } from "scrooge/api";
 import type { Channel } from "scrooge/api";
 
 const CHANNEL: Channel = "pi";
 
 const SUPPORTED_EXTENSIONS = ["kt", "ts", "tsx", "dart", "py"];
+const CODE_EXTENSIONS = ["kt", "ts", "tsx", "js", "jsx", "dart", "py", "rb", "go", "rs", "java"];
+
+const NUDGE_MESSAGES: Record<string, string> = {
+  read: "Scrooge tip: scrooge_lookup finds a symbol's definition and all usages in one call. Try it before reading multiple files.",
+  grep: "Scrooge tip: scrooge_search returns ranked, sketch-compressed results across the entire codebase. Try scrooge_search instead of grep for code exploration.",
+  glob: "Scrooge tip: scrooge_map provides a hierarchical repo overview with summaries. Try scrooge_map instead of glob for understanding project structure.",
+};
+
+const MAX_NUDGES = 3;
+let nudgeCount = 0;
+let repoIndexedCache: boolean | null = null;
+
+async function isRepoIndexed(): Promise<boolean> {
+  if (repoIndexedCache !== null) return repoIndexedCache;
+
+  const dbPath = join(homedir(), ".scrooge", "scrooge.db");
+  if (!existsSync(dbPath)) {
+    repoIndexedCache = false;
+    return false;
+  }
+
+  try {
+    const result = await scroogeStatus(
+      { channel: CHANNEL, repoPath: undefined, model: process.env.SCROOGE_MODEL },
+    );
+    repoIndexedCache = (result.total_chunks ?? 0) > 0;
+  } catch {
+    repoIndexedCache = false;
+  }
+  return repoIndexedCache;
+}
+
+async function maybeNudge(toolName: string, event: Record<string, unknown>): Promise<{ additionalContext: string } | undefined> {
+  if (nudgeCount >= MAX_NUDGES) return;
+
+  // For read: only nudge on code files
+  if (toolName === "read") {
+    const input = event.input as Record<string, unknown> | undefined;
+    const filePath = input?.file_path as string | undefined;
+    if (filePath) {
+      const ext = filePath.split(".").pop();
+      if (!ext || !CODE_EXTENSIONS.includes(ext)) return;
+    }
+  }
+
+  const indexed = await isRepoIndexed();
+  if (!indexed) return;
+
+  const message = NUDGE_MESSAGES[toolName];
+  if (!message) return;
+
+  nudgeCount++;
+  return { additionalContext: message };
+}
 
 function observeToolCall(toolName: string): void {
   try {
@@ -247,6 +302,11 @@ export default function (pi: PiExtensionAPI): void {
   pi.on("tool_call", async (event) => {
     const toolName = event.toolName as string | undefined;
     if (toolName) observeToolCall(toolName);
+
+    // Nudge for exploration tools
+    if (toolName === "read" || toolName === "grep" || toolName === "glob") {
+      return maybeNudge(toolName, event);
+    }
 
     if (toolName !== "write" && toolName !== "edit") return;
 

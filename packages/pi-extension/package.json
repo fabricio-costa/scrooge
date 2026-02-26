@@ -1,6 +1,6 @@
 {
   "name": "@fabricio-costa/pi-scrooge",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Scrooge code search tools for pi.dev — hybrid RAG and repo maps",
   "type": "module",
   "main": "dist/index.js",

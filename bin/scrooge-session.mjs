@@ -5,7 +5,8 @@
  *
  * Injects a repository index summary and behavioral directives at session start.
  * If the current working directory is an indexed git repo, returns additionalContext
- * with stats and tool preferences. Returns {} for non-indexed repos (zero overhead).
+ * with stats and tool preferences. For non-indexed git repos, suggests running
+ * scrooge_reindex to enable code intelligence.
  *
  * Lightweight: imports only better-sqlite3 (no Scrooge dist, no tree-sitter).
  *
@@ -29,12 +30,6 @@ const DB_PATH = join(homedir(), ".scrooge", "scrooge.db");
 async function main() {
   let input = "";
   for await (const chunk of process.stdin) input += chunk;
-
-  // Quick check: if no DB file, nothing to do
-  if (!existsSync(DB_PATH)) {
-    process.stdout.write("{}");
-    return;
-  }
 
   let cwd;
   try {
@@ -64,6 +59,18 @@ async function main() {
     return;
   }
 
+  // If no DB file, suggest indexing for git repos
+  if (!existsSync(DB_PATH)) {
+    const context = [
+      "## Scrooge Code Intelligence (available)",
+      "This repository has not been indexed yet.",
+      "Run `scrooge_reindex` to enable code-aware search, symbol lookup, and repo maps.",
+      "After indexing, PREFER Scrooge tools over native Read/Grep/Glob for code exploration.",
+    ].join("\n");
+    process.stdout.write(JSON.stringify({ additionalContext: context }));
+    return;
+  }
+
   // Query index_meta for this repo
   try {
     const Database = (await import("better-sqlite3")).default;
@@ -73,7 +80,13 @@ async function main() {
       const row = db.prepare("SELECT total_files, total_chunks, last_indexed_at, last_commit_sha FROM index_meta WHERE repo_path = ?").get(repoPath);
 
       if (!row) {
-        process.stdout.write("{}");
+        const context = [
+          "## Scrooge Code Intelligence (available)",
+          "This repository has not been indexed yet.",
+          "Run `scrooge_reindex` to enable code-aware search, symbol lookup, and repo maps.",
+          "After indexing, PREFER Scrooge tools over native Read/Grep/Glob for code exploration.",
+        ].join("\n");
+        process.stdout.write(JSON.stringify({ additionalContext: context }));
         return;
       }
 

@@ -25,7 +25,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
-const DB_PATH = join(homedir(), ".scrooge", "scrooge.db");
+const DB_PATH = process.env.SCROOGE_DB_PATH || join(homedir(), ".scrooge", "scrooge.db");
 const MAX_NUDGES = 3;
 
 const NUDGES = {

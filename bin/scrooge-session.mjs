@@ -25,7 +25,7 @@ import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-const DB_PATH = join(homedir(), ".scrooge", "scrooge.db");
+const DB_PATH = process.env.SCROOGE_DB_PATH || join(homedir(), ".scrooge", "scrooge.db");
 
 async function main() {
   let input = "";

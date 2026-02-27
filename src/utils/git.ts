@@ -2,7 +2,7 @@ import { execFileSync } from "node:child_process";
 
 const SHA_RE = /^[0-9a-f]{4,40}$/i;
 const GIT_ENV = { ...process.env, GIT_CONFIG_NOSYSTEM: "1" };
-const MAX_BUFFER = 50 * 1024 * 1024; // 50MB — enough for repos with 100k+ files
+export const MAX_BUFFER = 50 * 1024 * 1024; // 50MB — enough for repos with 100k+ files
 
 function assertSha(value: string, label: string): void {
   if (!SHA_RE.test(value)) {

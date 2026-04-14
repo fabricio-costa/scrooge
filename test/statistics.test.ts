@@ -18,7 +18,7 @@ vi.mock("node:os", async (importOriginal) => {
 // Import after mock setup
 const { openDb, recordToolCall } = await import("../src/storage/db.js");
 type ToolCallRecord = import("../src/storage/db.js").ToolCallRecord;
-const { buildStatisticsReport } = await import("../src/api/statistics.js");
+const { buildStatisticsReport, buildStatisticsData } = await import("../src/api/statistics.js");
 type Database = import("better-sqlite3").Database;
 
 let db: Database;
@@ -184,6 +184,74 @@ describe("buildStatisticsReport", () => {
     expect(report).toContain("both 38%");
   });
 
+  it("returns structured dashboard-friendly data", () => {
+    insertCalls([
+      {
+        tool: "search",
+        repo_path: "/test/repo",
+        duration_ms: 100,
+        tokens_sent: 500,
+        tokens_raw: 3000,
+        channel: "pi",
+        model: "claude-opus-4-6",
+        metadata: { query: "login", resultCount: 5, sources: { lexical: 2, vector: 1, both: 2 } },
+      },
+      {
+        tool: "lookup",
+        repo_path: "/test/repo",
+        duration_ms: 80,
+        tokens_sent: 200,
+        tokens_raw: 1000,
+        channel: "mcp",
+      },
+    ]);
+
+    const data = buildStatisticsData(db, "/test/repo", "all");
+
+    expect(data.empty).toBe(false);
+    expect(data.repo).toEqual({ path: "/test/repo", name: "repo" });
+    expect(data.totals).toEqual({
+      totalCalls: 2,
+      tokensDelivered: 700,
+      rawEquivalent: 4000,
+      tokensSaved: 3300,
+      savingsPct: 82.5,
+    });
+    expect(data.usageByTool).toEqual([
+      {
+        tool: "lookup",
+        callCount: 1,
+        tokensSent: 200,
+        tokensRaw: 1000,
+        tokensSaved: 800,
+        savingsPct: 80,
+      },
+      {
+        tool: "search",
+        callCount: 1,
+        tokensSent: 500,
+        tokensRaw: 3000,
+        tokensSaved: 2500,
+        savingsPct: 83.3,
+      },
+    ]);
+    expect(data.channels).toEqual([
+      { channel: "mcp", callCount: 1 },
+      { channel: "pi", callCount: 1 },
+    ]);
+    expect(data.models).toEqual([
+      { model: "claude-opus-4-6", callCount: 1, tokensSent: 500 },
+      { model: "unknown", callCount: 1, tokensSent: 200 },
+    ]);
+    expect(data.searchInsights).toEqual({
+      callCount: 1,
+      avgResults: 5,
+      avgTokens: 500,
+      sourceCounts: { lexical: 2, vector: 1, both: 2 },
+      sourceMixPct: { lexical: 40, vector: 20, both: 40 },
+    });
+  });
+
   it("should filter by repo_path", () => {
     insertCalls([
       { tool: "search", repo_path: "/repo-a", duration_ms: 100, tokens_sent: 500, tokens_raw: 3000 },
@@ -334,6 +402,115 @@ describe("buildStatisticsReport — Agent Coverage", () => {
     expect(report).toContain("Scrooge exploration: 2 calls");
     expect(report).toContain("Native exploration:  1 calls");
     expect(report).toContain("Coverage: 66.7%");
+  });
+
+  it("returns structured coverage data for dashboards", () => {
+    recordToolCall(db, {
+      tool: "search",
+      repo_path: "/test/repo",
+      duration_ms: 100,
+      tokens_sent: 500,
+      tokens_raw: 3000,
+    });
+
+    const records = [
+      { t: "2026-02-25T10:00:00Z", tool: "mcp__scrooge__scrooge_search", repo: "/test/repo", sid: "s1" },
+      { t: "2026-02-25T10:01:00Z", tool: "mcp__scrooge__scrooge_lookup", repo: "/test/repo", sid: "s1" },
+      { t: "2026-02-25T10:02:00Z", tool: "Read", repo: "/test/repo", sid: "s1", path: "src/app.ts", isCodeFile: true },
+      { t: "2026-02-25T10:03:00Z", tool: "Read", repo: "/test/repo", sid: "s1", path: "db/schema.sql", isCodeFile: true, reasonCode: "non_code_file" },
+      { t: "2026-02-25T10:04:00Z", tool: "Read", repo: "/test/repo", sid: "s1", path: "src/flow.ts", isCodeFile: true, guidedBy: "search" },
+      { t: "2026-02-25T10:05:00Z", tool: "Grep", repo: "/test/repo", sid: "s1", selector: "LoginViewModel", reasonCode: "known_path_regex" },
+      { t: "2026-02-25T10:06:00Z", tool: "Glob", repo: "/test/repo", sid: "s1", selector: "src/**/*.ts" },
+    ];
+    writeFileSync(observedPath, records.map((r) => JSON.stringify(r)).join("\n") + "\n");
+
+    const data = buildStatisticsData(db, "/test/repo", "all");
+
+    expect(data.coverage).toEqual({
+      scroogeExplorationTotal: 2,
+      nativeExplorationTotal: 5,
+      totalExploration: 7,
+      coveragePct: 28.6,
+      scroogeExplorationByTool: [
+        { tool: "lookup", count: 1 },
+        { tool: "search", count: 1 },
+      ],
+      nativeExplorationByTool: [
+        { tool: "Read", count: 3 },
+        { tool: "Glob", count: 1 },
+        { tool: "Grep", count: 1 },
+      ],
+      codeReads: {
+        total: 3,
+        guided: 1,
+        blind: 2,
+        blindRatePct: 66.7,
+        byExtension: [
+          { extension: ".ts", total: 2, guided: 1, blind: 1, blindRatePct: 50 },
+          { extension: ".sql", total: 1, guided: 0, blind: 1, blindRatePct: 100 },
+        ],
+        guidedBy: [{ tool: "search", count: 1, bouncePct: 100 }],
+        blindHotspots: [
+          { path: "db/schema.sql", count: 1 },
+          { path: "src/app.ts", count: 1 },
+        ],
+      },
+      grepBypasses: [{ selector: "LoginViewModel", count: 1 }],
+      globBypasses: [{ selector: "src/**/*.ts", count: 1 }],
+      bypassReasons: [
+        { reasonCode: "known_path_regex", count: 1 },
+        { reasonCode: "non_code_file", count: 1 },
+      ],
+      otherCalls: [],
+    });
+  });
+
+  it("shows adoption coverage even when no Scrooge tool calls exist yet", () => {
+    const records = [
+      { t: "2026-02-25T10:00:00Z", tool: "Read", repo: "/test/repo", sid: "s1", path: "src/app.ts", isCodeFile: true },
+      { t: "2026-02-25T10:01:00Z", tool: "Grep", repo: "/test/repo", sid: "s1", selector: "LoginViewModel" },
+    ];
+    writeFileSync(observedPath, records.map((r) => JSON.stringify(r)).join("\n") + "\n");
+
+    const report = buildStatisticsReport(db, "/test/repo", "all");
+
+    expect(report).toContain("### Usage (0 total calls)");
+    expect(report).toContain("No Scrooge tool calls recorded yet.");
+    expect(report).toContain("### Agent Coverage");
+    expect(report).toContain("Native exploration:  2 calls");
+    expect(report).toContain("Coverage: 0.0% of exploration calls used Scrooge (0 of 2)");
+  });
+
+  it("should surface blind read hotspots and bypass diagnostics", () => {
+    recordToolCall(db, {
+      tool: "search",
+      repo_path: "/test/repo",
+      duration_ms: 100,
+      tokens_sent: 500,
+      tokens_raw: 3000,
+    });
+
+    const records = [
+      { t: "2026-02-25T10:00:00Z", tool: "Read", repo: "/test/repo", sid: "s1", path: "src/app.ts", isCodeFile: true },
+      { t: "2026-02-25T10:01:00Z", tool: "Read", repo: "/test/repo", sid: "s1", path: "db/schema.sql", isCodeFile: true, reasonCode: "non_code_file" },
+      { t: "2026-02-25T10:02:00Z", tool: "Read", repo: "/test/repo", sid: "s1", path: "src/flow.ts", isCodeFile: true, guidedBy: "search" },
+      { t: "2026-02-25T10:03:00Z", tool: "Grep", repo: "/test/repo", sid: "s1", selector: "LoginViewModel", reasonCode: "known_path_regex" },
+      { t: "2026-02-25T10:04:00Z", tool: "Glob", repo: "/test/repo", sid: "s1", selector: "src/**/*.ts" },
+    ];
+    writeFileSync(observedPath, records.map((r) => JSON.stringify(r)).join("\n") + "\n");
+
+    const report = buildStatisticsReport(db, "/test/repo", "all");
+    expect(report).toContain("Code read mix:");
+    expect(report).toContain(".sql: 1 (1 blind, 100.0% blind)");
+    expect(report).toContain("Blind hotspots:");
+    expect(report).toContain("db/schema.sql: 1");
+    expect(report).toContain("Grep bypasses:");
+    expect(report).toContain("LoginViewModel: 1");
+    expect(report).toContain("Glob bypasses:");
+    expect(report).toContain("src/**/*.ts: 1");
+    expect(report).toContain("Bypass reasons:");
+    expect(report).toContain("known_path_regex: 1");
+    expect(report).toContain("non_code_file: 1");
   });
 
   it("should omit Agent Coverage when no observed data exists", () => {

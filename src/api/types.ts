@@ -44,11 +44,14 @@ export interface LookupParams {
 }
 
 export interface LookupChunk {
+  id: string;
   path: string;
   lines: string;
   kind: string;
   symbol: string | null;
   module: string | null;
+  language: string;
+  signature: string | null;
   sketch: string;
 }
 
@@ -56,6 +59,43 @@ export interface LookupResponse {
   symbol: string;
   definitions: LookupChunk[];
   usages?: LookupChunk[];
+  _note?: string;
+}
+
+// --- Source ---
+
+export interface SourceParams {
+  chunkId?: string;
+  symbol?: string;
+  before?: number;
+  after?: number;
+}
+
+export interface SourceContext {
+  lines: string;
+  text: string;
+}
+
+export interface SourceChunk {
+  id: string;
+  path: string;
+  lines: string;
+  kind: string;
+  symbol: string | null;
+  module: string | null;
+  language: string;
+  signature: string | null;
+  source: string;
+  beforeContext?: SourceContext;
+  afterContext?: SourceContext;
+}
+
+export interface SourceResponse {
+  chunkId?: string;
+  symbol?: string;
+  before: number;
+  after: number;
+  chunks: SourceChunk[];
   _note?: string;
 }
 
@@ -137,12 +177,133 @@ export interface DepsResponse {
 
 // --- Statistics ---
 
+export type StatisticsPeriod = "today" | "week" | "month" | "all";
+export type StatisticsFormat = "text" | "json";
+
 export interface StatisticsParams {
-  period?: "today" | "week" | "month" | "all";
+  period?: StatisticsPeriod;
+  format?: StatisticsFormat;
+}
+
+export interface StatisticsTotals {
+  totalCalls: number;
+  tokensDelivered: number;
+  rawEquivalent: number;
+  tokensSaved: number;
+  savingsPct: number;
+}
+
+export interface StatisticsToolSummary {
+  tool: string;
+  callCount: number;
+  tokensSent: number;
+  tokensRaw: number;
+  tokensSaved: number;
+  savingsPct: number | null;
+}
+
+export interface StatisticsChannelSummary {
+  channel: string;
+  callCount: number;
+}
+
+export interface StatisticsModelSummary {
+  model: string;
+  callCount: number;
+  tokensSent: number;
+}
+
+export interface StatisticsSearchInsights {
+  callCount: number;
+  avgResults: number;
+  avgTokens: number;
+  sourceCounts: { lexical: number; vector: number; both: number };
+  sourceMixPct: { lexical: number; vector: number; both: number };
+}
+
+export interface StatisticsToolCount {
+  tool: string;
+  count: number;
+}
+
+export interface StatisticsPathCount {
+  path: string;
+  count: number;
+}
+
+export interface StatisticsSelectorCount {
+  selector: string;
+  count: number;
+}
+
+export interface StatisticsReasonCount {
+  reasonCode: string;
+  count: number;
+}
+
+export interface StatisticsCodeReadExtensionSummary {
+  extension: string;
+  total: number;
+  guided: number;
+  blind: number;
+  blindRatePct: number;
+}
+
+export interface StatisticsGuidedReadSummary {
+  tool: string;
+  count: number;
+  bouncePct: number | null;
+}
+
+export interface StatisticsCoverageSummary {
+  scroogeExplorationTotal: number;
+  nativeExplorationTotal: number;
+  totalExploration: number;
+  coveragePct: number;
+  scroogeExplorationByTool: StatisticsToolCount[];
+  nativeExplorationByTool: StatisticsToolCount[];
+  codeReads: {
+    total: number;
+    guided: number;
+    blind: number;
+    blindRatePct: number;
+    byExtension: StatisticsCodeReadExtensionSummary[];
+    guidedBy: StatisticsGuidedReadSummary[];
+    blindHotspots: StatisticsPathCount[];
+  };
+  grepBypasses: StatisticsSelectorCount[];
+  globBypasses: StatisticsSelectorCount[];
+  bypassReasons: StatisticsReasonCount[];
+  otherCalls: StatisticsToolCount[];
+}
+
+export interface StatisticsData {
+  repo: {
+    path: string;
+    name: string;
+  };
+  period: {
+    key: StatisticsPeriod;
+    label: string;
+    since: string | null;
+    firstCallAt: string | null;
+  };
+  generatedAt: string;
+  empty: boolean;
+  message?: string;
+  totals: StatisticsTotals;
+  usageByTool: StatisticsToolSummary[];
+  savingsByTool: StatisticsToolSummary[];
+  channels: StatisticsChannelSummary[];
+  models: StatisticsModelSummary[];
+  searchInsights: StatisticsSearchInsights | null;
+  coverage: StatisticsCoverageSummary | null;
 }
 
 export interface StatisticsResponse {
+  format: StatisticsFormat;
   report: string;
+  data: StatisticsData;
 }
 
 // --- Export ---

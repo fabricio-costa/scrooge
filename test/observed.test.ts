@@ -46,6 +46,7 @@ describe("categorize", () => {
     expect(categorize("mcp__scrooge__scrooge_map")).toBe("scrooge_exploration");
     expect(categorize("mcp__scrooge__scrooge_context")).toBe("scrooge_exploration");
     expect(categorize("mcp__scrooge__scrooge_deps")).toBe("scrooge_exploration");
+    expect(categorize("mcp__scrooge__scrooge_source")).toBe("scrooge_exploration");
   });
 
   it("should classify pi.dev scrooge tools as scrooge_exploration", () => {
@@ -54,6 +55,7 @@ describe("categorize", () => {
     expect(categorize("pi:scrooge_map")).toBe("scrooge_exploration");
     expect(categorize("pi:scrooge_context")).toBe("scrooge_exploration");
     expect(categorize("pi:scrooge_deps")).toBe("scrooge_exploration");
+    expect(categorize("pi:scrooge_source")).toBe("scrooge_exploration");
   });
 
   it("should classify Claude Code native exploration tools", () => {
@@ -164,8 +166,8 @@ describe("readObserved", () => {
 });
 
 describe("computeCoverage", () => {
-  function makeRecord(tool: string, repo = "/test"): ObservedRecord {
-    return { t: "2026-02-25T10:00:00Z", tool, repo, sid: "s1" };
+  function makeRecord(tool: string, repo = "/test", extra: Partial<ObservedRecord> = {}): ObservedRecord {
+    return { t: "2026-02-25T10:00:00Z", tool, repo, sid: "s1", ...extra };
   }
 
   it("should compute correct coverage percentage", () => {
@@ -238,6 +240,38 @@ describe("computeCoverage", () => {
     expect(result.nativeExploration.get("Read")).toBe(1);
     expect(result.other.get("Write")).toBe(1);
   });
+
+  it("should track guided and blind code reads", () => {
+    const records = [
+      makeRecord("mcp__scrooge__scrooge_search"),
+      makeRecord("Read", "/test", { isCodeFile: true, path: "src/a.ts", guidedBy: "search" }),
+      makeRecord("Read", "/test", { isCodeFile: true, path: "src/b.ts" }),
+      makeRecord("Read", "/test", { isCodeFile: false, path: "README.md" }),
+    ];
+
+    const result = computeCoverage(records);
+    expect(result.codeReads).toBe(2);
+    expect(result.guidedCodeReads).toBe(1);
+    expect(result.blindCodeReads).toBe(1);
+    expect(result.guidedReadBy.get("search")).toBe(1);
+  });
+
+  it("should track code-read extensions and native bypass selectors", () => {
+    const records = [
+      makeRecord("Read", "/test", { isCodeFile: true, path: "src/app.ts" }),
+      makeRecord("Read", "/test", { isCodeFile: true, path: "db/schema.sql", guidedBy: "lookup" }),
+      makeRecord("Grep", "/test", { selector: "LoginViewModel", reasonCode: "known_path_regex" }),
+      makeRecord("Glob", "/test", { selector: "src/**/*.ts" }),
+    ];
+
+    const result = computeCoverage(records);
+    expect(result.codeReadByExtension.get(".ts")).toEqual({ total: 1, guided: 0, blind: 1 });
+    expect(result.codeReadByExtension.get(".sql")).toEqual({ total: 1, guided: 1, blind: 0 });
+    expect(result.blindReadPaths.get("src/app.ts")).toBe(1);
+    expect(result.grepSelectors.get("LoginViewModel")).toBe(1);
+    expect(result.globSelectors.get("src/**/*.ts")).toBe(1);
+    expect(result.nativeReasonCodes.get("known_path_regex")).toBe(1);
+  });
 });
 
 describe("cleanupObserved", () => {
@@ -276,8 +310,24 @@ describe("formatCoverageSection", () => {
       { t: "2026-02-25T10:00:00Z", tool: "mcp__scrooge__scrooge_search", repo: "/test", sid: "s1" },
       { t: "2026-02-25T10:01:00Z", tool: "mcp__scrooge__scrooge_search", repo: "/test", sid: "s1" },
       { t: "2026-02-25T10:02:00Z", tool: "mcp__scrooge__scrooge_lookup", repo: "/test", sid: "s1" },
-      { t: "2026-02-25T10:03:00Z", tool: "Read", repo: "/test", sid: "s1" },
-      { t: "2026-02-25T10:04:00Z", tool: "Write", repo: "/test", sid: "s1" },
+      {
+        t: "2026-02-25T10:03:00Z",
+        tool: "Read",
+        repo: "/test",
+        sid: "s1",
+        path: "src/app.ts",
+        isCodeFile: true,
+        guidedBy: "search",
+      },
+      {
+        t: "2026-02-25T10:04:00Z",
+        tool: "Read",
+        repo: "/test",
+        sid: "s1",
+        path: "src/other.ts",
+        isCodeFile: true,
+      },
+      { t: "2026-02-25T10:05:00Z", tool: "Write", repo: "/test", sid: "s1" },
     ];
     writeFileSync(observedPath, records.map((r) => JSON.stringify(r)).join("\n") + "\n");
 
@@ -286,11 +336,41 @@ describe("formatCoverageSection", () => {
     expect(section).toContain("Scrooge exploration: 3 calls");
     expect(section).toContain("search: 2");
     expect(section).toContain("lookup: 1");
-    expect(section).toContain("Native exploration:  1 calls");
-    expect(section).toContain("Read: 1");
+    expect(section).toContain("Native exploration:  2 calls");
+    expect(section).toContain("Read: 2");
+    expect(section).toContain("Code reads:          2 (1 guided, 1 blind)");
+    expect(section).toContain("Blind read rate:     50.0% of code reads skipped Scrooge");
+    expect(section).toContain("Read bounce:         search→Read 1 (50.0% of search)");
     expect(section).toContain("Other agent calls:   1");
-    expect(section).toContain("Coverage: 75.0%");
-    expect(section).toContain("3 of 4");
+    expect(section).toContain("Coverage: 60.0%");
+    expect(section).toContain("3 of 5");
+  });
+
+  it("should include diagnostics for hotspots and native bypass selectors", () => {
+    const records = [
+      { t: "2026-02-25T10:00:00Z", tool: "Read", repo: "/test", sid: "s1", path: "src/app.ts", isCodeFile: true },
+      { t: "2026-02-25T10:01:00Z", tool: "Read", repo: "/test", sid: "s1", path: "db/schema.sql", isCodeFile: true, reasonCode: "non_code_file" },
+      { t: "2026-02-25T10:02:00Z", tool: "Read", repo: "/test", sid: "s1", path: "src/flow.ts", isCodeFile: true, guidedBy: "search" },
+      { t: "2026-02-25T10:03:00Z", tool: "Grep", repo: "/test", sid: "s1", selector: "LoginViewModel", reasonCode: "known_path_regex" },
+      { t: "2026-02-25T10:04:00Z", tool: "Grep", repo: "/test", sid: "s1", selector: "LoginViewModel" },
+      { t: "2026-02-25T10:05:00Z", tool: "Glob", repo: "/test", sid: "s1", selector: "src/**/*.ts" },
+    ];
+    writeFileSync(observedPath, records.map((r) => JSON.stringify(r)).join("\n") + "\n");
+
+    const section = formatCoverageSection("/test");
+    expect(section).toContain("Code read mix:");
+    expect(section).toContain(".ts: 2 (1 blind, 50.0% blind)");
+    expect(section).toContain(".sql: 1 (1 blind, 100.0% blind)");
+    expect(section).toContain("Blind hotspots:");
+    expect(section).toContain("src/app.ts: 1");
+    expect(section).toContain("db/schema.sql: 1");
+    expect(section).toContain("Grep bypasses:");
+    expect(section).toContain("LoginViewModel: 2");
+    expect(section).toContain("Glob bypasses:");
+    expect(section).toContain("src/**/*.ts: 1");
+    expect(section).toContain("Bypass reasons:");
+    expect(section).toContain("known_path_regex: 1");
+    expect(section).toContain("non_code_file: 1");
   });
 
   it("should return null when only non-exploration calls exist for repo", () => {

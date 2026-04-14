@@ -12,14 +12,18 @@ export function registerStatisticsTool(server: McpServer): void {
         .enum(["today", "week", "month", "all"])
         .optional()
         .describe('Time period to aggregate: "today", "week", "month", "all" (default "all")'),
+      format: z
+        .enum(["text", "json"])
+        .optional()
+        .describe('Output format: "text" (default) or "json" for structured dashboard-friendly data'),
     },
-    async ({ repo_path, period }) => {
+    async ({ repo_path, period, format }) => {
       const result = await statistics(
-        { period },
+        { period, format },
         { channel: "mcp", repoPath: repo_path, model: process.env.SCROOGE_MODEL },
       );
       return {
-        content: [{ type: "text" as const, text: result.report }],
+        content: [{ type: "text" as const, text: format === "json" ? JSON.stringify(result.data, null, 2) : result.report }],
       };
     },
   );

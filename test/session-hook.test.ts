@@ -165,6 +165,40 @@ describe("scrooge-session.mjs hook", () => {
       const ctx = result.additionalContext as string;
       expect(ctx).toContain(sha.slice(0, 7));
     });
+
+    it("surfaces strict guardrail policy when configured", () => {
+      execSync("git init", { cwd: tempDir });
+      execSync('git config user.email "test@test.com"', { cwd: tempDir });
+      execSync('git config user.name "Test"', { cwd: tempDir });
+      writeFileSync(join(tempDir, "file.kt"), "class A");
+      execSync("git add file.kt", { cwd: tempDir });
+      execSync('git commit -m "initial"', { cwd: tempDir });
+
+      const repoPath = execSync("git rev-parse --show-toplevel", {
+        cwd: tempDir,
+        encoding: "utf-8",
+      }).trim();
+      const sha = execSync("git rev-parse HEAD", {
+        cwd: tempDir,
+        encoding: "utf-8",
+      }).trim();
+
+      const db = new Database(dbPath);
+      db.exec(INDEX_META_DDL);
+      db.prepare("INSERT INTO index_meta VALUES (?, ?, ?, ?, ?)").run(
+        repoPath, 100, 500, new Date().toISOString(), sha,
+      );
+      db.close();
+
+      const result = runHook({ cwd: tempDir }, {
+        SCROOGE_DB_PATH: dbPath,
+        SCROOGE_NATIVE_EXPLORATION_POLICY: "strict",
+      });
+
+      const ctx = result.additionalContext as string;
+      expect(ctx).toContain("Native exploration policy: strict");
+      expect(ctx).toContain("blocked");
+    });
   });
 
   describe("edge cases", () => {

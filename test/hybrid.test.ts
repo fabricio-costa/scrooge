@@ -1,6 +1,9 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { openDb, insertChunk, insertVecEmbedding } from "../src/storage/db.js";
 import { lexicalSearch } from "../src/retrieval/lexical.js";
+import * as lexicalModule from "../src/retrieval/lexical.js";
+import * as vectorModule from "../src/retrieval/vector.js";
+import { hybridSearch } from "../src/retrieval/hybrid.js";
 import type { SearchResult } from "../src/retrieval/types.js";
 import type { ChunkRow } from "../src/storage/db.js";
 import type Database from "better-sqlite3";
@@ -8,6 +11,10 @@ import type Database from "better-sqlite3";
 let db: Database.Database;
 
 const REPO_PATH = "/test/repo";
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 /** Helper to create a minimal chunk row for insertion. */
 function makeChunk(overrides: Partial<Omit<ChunkRow, "created_at">> & { id: string }): Omit<ChunkRow, "created_at"> {
@@ -477,5 +484,64 @@ describe("RRF fusion", () => {
     expect(resultB.score).toBeCloseTo(scoreB, 10);
     // A should rank higher than B
     expect(resultA.rank).toBeLessThan(resultB.rank);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// D. Heuristic reranking after RRF
+// ---------------------------------------------------------------------------
+describe("hybrid reranking", () => {
+  beforeEach(() => {
+    db = openDb(":memory:");
+  });
+
+  afterEach(() => {
+    db.close();
+  });
+
+  it("boosts exact symbol and path matches above pure RRF ordering", async () => {
+    const distractor = mockResult("SearchHandler", 1, "lexical");
+    const exact = mockResult("LoginViewModel", 2, "lexical");
+    exact.metadata = { lexicalVariants: ["broad"] };
+
+    vi.spyOn(lexicalModule, "lexicalSearch").mockReturnValue([distractor, exact]);
+    vi.spyOn(vectorModule, "vectorSearch").mockResolvedValue([
+      {
+        ...distractor,
+        source: "vector",
+        score: 0.95,
+        rank: 1,
+      },
+    ]);
+
+    const result = await hybridSearch(db, REPO_PATH, "LoginViewModel", {}, 5);
+
+    expect(result.results[0].chunk.id).toBe("LoginViewModel");
+
+    const exactScore = result.metrics.scores.find((score) => score.chunkId === "LoginViewModel");
+    expect(exactScore?.reasons).toContain("exact_symbol");
+    expect(exactScore?.reasons).toContain("basename_match");
+    expect(exactScore?.finalScore).toBeGreaterThan(exactScore?.rrfScore ?? 0);
+  });
+
+  it("uses query expansions and kind/language hints during reranking", async () => {
+    const distractor = mockResult("ApiClient", 1, "lexical");
+    const vmChunk = mockResult("LoginViewModel", 2, "lexical");
+    vmChunk.chunk.kind = "viewmodel";
+    vmChunk.chunk.language = "kotlin";
+    vmChunk.metadata = { lexicalVariants: ["symbol_path"] };
+
+    vi.spyOn(lexicalModule, "lexicalSearch").mockReturnValue([distractor, vmChunk]);
+    vi.spyOn(vectorModule, "vectorSearch").mockResolvedValue([]);
+
+    const result = await hybridSearch(db, REPO_PATH, "vm kotlin", {}, 5);
+
+    expect(result.results[0].chunk.id).toBe("LoginViewModel");
+    expect(result.metrics.query.expansions).toContain("viewmodel");
+
+    const vmScore = result.metrics.scores.find((score) => score.chunkId === "LoginViewModel");
+    expect(vmScore?.reasons).toContain("kind_hint");
+    expect(vmScore?.reasons).toContain("language_hint");
+    expect(vmScore?.reasons).toContain("symbol_path_hit");
   });
 });

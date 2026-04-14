@@ -4,6 +4,7 @@ import { registerStatusTool } from "./tools/status.js";
 import { registerSearchTool } from "./tools/search.js";
 import { registerMapTool } from "./tools/map.js";
 import { registerLookupTool } from "./tools/lookup.js";
+import { registerSourceTool } from "./tools/source.js";
 import { registerReindexTool } from "./tools/reindex.js";
 import { registerStatisticsTool } from "./tools/statistics.js";
 import { registerContextTool } from "./tools/context.js";
@@ -20,6 +21,7 @@ export function createServer(): McpServer {
   registerSearchTool(server);
   registerMapTool(server);
   registerLookupTool(server);
+  registerSourceTool(server);
   registerReindexTool(server);
   registerStatisticsTool(server);
   registerContextTool(server);

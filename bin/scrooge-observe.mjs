@@ -24,6 +24,7 @@
 import { appendFileSync, mkdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { buildObservedRecord } from "./hook-state.mjs";
 
 async function main() {
   let input = "";
@@ -36,20 +37,12 @@ async function main() {
     return;
   }
 
-  const toolName = payload.tool_name;
-  if (!toolName) return;
+  const record = buildObservedRecord(payload);
+  if (!record) return;
 
   const scroogeDir = join(homedir(), ".scrooge");
   mkdirSync(scroogeDir, { recursive: true });
-
-  const record = JSON.stringify({
-    t: new Date().toISOString(),
-    tool: String(toolName).slice(0, 200),
-    repo: String(payload.cwd ?? "").slice(0, 500),
-    sid: String(payload.session_id ?? "").slice(0, 100),
-  });
-
-  appendFileSync(join(scroogeDir, "observed.jsonl"), record + "\n");
+  appendFileSync(join(scroogeDir, "observed.jsonl"), JSON.stringify(record) + "\n");
 }
 
 main().catch(() => {});

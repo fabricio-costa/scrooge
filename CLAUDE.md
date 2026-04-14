@@ -24,7 +24,7 @@ For manual registration or development setup, see the README.
 
 ### scrooge_search
 
-Hybrid code search combining FTS5 lexical search and sqlite-vec vector search with RRF fusion.
+Hybrid code search combining query rewriting, FTS5 lexical search, sqlite-vec vector search, and a light heuristic reranker on top of RRF fusion.
 
 **Parameters:**
 | Parameter      | Type   | Required | Description |
@@ -32,9 +32,9 @@ Hybrid code search combining FTS5 lexical search and sqlite-vec vector search wi
 | `query`        | string | yes      | Natural language or code search query |
 | `repo_path`    | string | no       | Path to the repository (defaults to current) |
 | `filters`      | object | no       | Filter by `module`, `language`, `kind`, `tags` |
-| `view`         | string | no       | `"sketch"` (default) or `"raw"` for full content |
-| `max_results`  | number | no       | Maximum number of results to return |
-| `token_budget` | number | no       | Token budget for result packaging |
+| `view`         | string | no       | `"sketch"` (default), `"implementation"` for focused code context, or `"raw"` for full content |
+| `max_results`  | number | no       | Maximum number of results to return (default depends on view) |
+| `token_budget` | number | no       | Token budget for result packaging (default depends on view) |
 
 **Example output:**
 ```json
@@ -72,6 +72,21 @@ Symbol lookup: find a symbol's definition and its usages across the codebase.
 | `symbol`         | string  | yes      | Symbol name to look up |
 | `repo_path`      | string  | no       | Path to the repository |
 | `include_usages` | boolean | no       | Include usage locations (default: true) |
+
+### scrooge_source
+
+Get the exact raw source for a known chunk or symbol. Optimized to replace full-file reads when the agent already knows the target implementation.
+
+**Parameters:**
+| Parameter   | Type   | Required | Description |
+|-------------|--------|----------|-------------|
+| `chunk_id`  | string | no*      | Exact chunk ID returned by `scrooge_search` or `scrooge_lookup` |
+| `symbol`    | string | no*      | Symbol name to fetch raw source for |
+| `before`    | number | no       | Extra lines of file context before the chunk |
+| `after`     | number | no       | Extra lines of file context after the chunk |
+| `repo_path` | string | no       | Path to the repository |
+
+\* Provide at least one of `chunk_id` or `symbol`.
 
 ### scrooge_reindex
 
@@ -147,6 +162,7 @@ Usage and token savings metrics. Shows how much Scrooge saves by comparing compr
 |-------------|--------|----------|-------------|
 | `repo_path` | string | no       | Path to the repository |
 | `period`    | string | no       | `"today"`, `"week"`, `"month"`, `"all"` (default: `"all"`) |
+| `format`    | string | no       | `"text"` (default) or `"json"` for structured dashboard-friendly output |
 
 **Example output:**
 ```
@@ -175,11 +191,24 @@ Avg results/query: 5.2 | Avg tokens/query: 1,076
 Sources: lexical 30% | vector 25% | both 45%
 ```
 
+For dashboards or automation, request `format: "json"`:
+```json
+{
+  "repo": { "path": "/Users/alice/projects/kotlin-pdv", "name": "kotlin-pdv" },
+  "period": { "key": "all", "label": "all time (since 2026-02-20)", "since": null, "firstCallAt": "2026-02-20 09:15:00" },
+  "totals": { "totalCalls": 70, "tokensDelivered": 45200, "rawEquivalent": 120000, "tokensSaved": 74800, "savingsPct": 62.3 },
+  "usageByTool": [{ "tool": "search", "callCount": 42, "tokensSent": 1200, "tokensRaw": 8500, "tokensSaved": 7300, "savingsPct": 85.9 }],
+  "coverage": { "coveragePct": 81.4, "grepBypasses": [{ "selector": "AuthRepository", "count": 3 }], "bypassReasons": [{ "reasonCode": "known_path_regex", "count": 2 }] }
+}
+```
+
 **Environment variables:**
 
 | Variable | Description |
 |----------|-------------|
 | `SCROOGE_MODEL` | AI model identifier (e.g., `claude-opus-4-6`). Recorded in telemetry for per-model usage breakdown. |
+| `SCROOGE_NATIVE_EXPLORATION_POLICY` | Guardrail mode for native `Read`/`Grep`/`Glob` on indexed repos: `off`, `warn` (default), or `strict`. `strict` blocks blind code exploration while still allowing non-code reads, regex on a known path, and guided follow-up reads. |
+| `SCROOGE_NATIVE_EXPLORATION_OVERRIDE_REASON` | Optional operator override reason code for intentional native bypasses: `known_raw_content`, `known_path_regex`, `non_code_file`, or `final_verification`. Recorded in diagnostics when applicable. |
 
 ## Hooks
 
@@ -199,19 +228,24 @@ Injects project patterns (annotations, imports, example sketches) before Write/E
 - **Claude Code**: `bin/scrooge-hook.mjs` — timeout 1.5s, silent failure
 - **Pi.dev**: `tool_call` event handler in the extension
 
-### PreToolUse — Nudge (Read|Grep|Glob)
+### PreToolUse — Nudge / Guardrail (Read|Grep|Glob)
 
-Suggests Scrooge alternatives when agents use native exploration tools on indexed repos. Rate-limited to 3 nudges per session to avoid being invasive.
+Applies configurable native-exploration guardrails on indexed repos via `SCROOGE_NATIVE_EXPLORATION_POLICY`:
+- `off` — no interception
+- `warn` (default) — suggests Scrooge alternatives, rate-limited to 3 nudges per session
+- `strict` — blocks blind code exploration while still allowing non-code reads, regex on a known path, and guided follow-up reads
 
-- **Claude Code**: `bin/scrooge-nudge.mjs` — lightweight (no Scrooge dist imports), rate-limited via temp file
-- **Pi.dev**: `tool_call` event handler with in-memory rate limiting
+Optional operator override codes can be supplied through `SCROOGE_NATIVE_EXPLORATION_OVERRIDE_REASON` (`known_raw_content`, `known_path_regex`, `non_code_file`, `final_verification`) and are recorded in diagnostics.
+
+- **Claude Code**: `bin/scrooge-nudge.mjs` — lightweight (no Scrooge dist imports), temp-file session state
+- **Pi.dev**: `tool_call` event handler with in-memory session state
 
 ### PostToolUse — Observability
 
 Records all tool calls to `~/.scrooge/observed.jsonl` for coverage metrics (what % of exploration used Scrooge vs native tools).
 
 - **Claude Code**: `bin/scrooge-observe.mjs`
-- **Pi.dev**: `observeToolCall()` in the extension
+- **Pi.dev**: `tool_result` event handler in the extension
 
 ## Architecture
 
@@ -219,7 +253,7 @@ Records all tool calls to `~/.scrooge/observed.jsonl` for coverage metrics (what
 - **MCP Server** (`src/server/`): Thin adapters — Zod schema, param mapping, calls `src/api/*` with `channel: "mcp"`, wraps result in MCP format
 - **pi.dev Extension** (`packages/pi-extension/`): TypeBox schemas, calls `src/api/*` with `channel: "pi"`, registers tools via `pi.registerTool()`
 - **Indexer** (`src/indexer/`): Pipeline that classifies files, chunks them semantically (tree-sitter for Kotlin, TypeScript, Dart, and Python), generates sketches, and computes embeddings
-- **Retrieval** (`src/retrieval/`): Hybrid search (FTS5 lexical + sqlite-vec vector) with RRF fusion and token-budgeted packaging
+- **Retrieval** (`src/retrieval/`): Query planning + hybrid search (FTS5 lexical + sqlite-vec vector) with RRF fusion, heuristic reranking, and token-budgeted packaging
 - **Repo Map** (`src/repomap/`): Directory tree and hierarchical summaries from indexed data
 - **Storage** (`src/storage/`): SQLite with better-sqlite3, FTS5 for lexical search, sqlite-vec for vector search
 - **Auto-reindex**: Search, map, and lookup automatically refresh the index when HEAD differs from last indexed commit (`src/utils/freshness.ts`). No manual `scrooge_reindex` needed

@@ -5,7 +5,7 @@ import { search } from "../../api/search.js";
 export function registerSearchTool(server: McpServer): void {
   server.tool(
     "scrooge_search",
-    "Hybrid code search (lexical + vector) across an indexed repository. Returns ranked chunks with token-budgeted snippets. Use sketch view for planning, raw view for implementation.",
+    "Hybrid code search with query rewriting, lexical + vector retrieval, and heuristic reranking across an indexed repository. Returns ranked chunks with token-budgeted snippets. Use sketch for planning, implementation for focused code understanding, and raw for full source.",
     {
       query: z.string().min(1).max(1000).describe("Search query (natural language or identifier)"),
       repo_path: z.string().max(500).optional().describe("Absolute path to the repository (defaults to cwd)"),
@@ -15,9 +15,9 @@ export function registerSearchTool(server: McpServer): void {
         kind: z.string().optional().describe("Filter by chunk kind (class, function, composable, etc.)"),
         tags: z.array(z.string()).optional().describe("Filter by tags (e.g., ['hilt', 'compose'])"),
       }).optional(),
-      view: z.enum(["sketch", "raw"]).optional().describe("sketch (compressed, default) or raw (full source)"),
-      max_results: z.number().int().min(1).max(100).optional().describe("Maximum results to return (default 8)"),
-      token_budget: z.number().int().min(100).max(50000).optional().describe("Maximum tokens in response (default 3000)"),
+      view: z.enum(["sketch", "implementation", "raw"]).optional().describe("sketch (compressed, default), implementation (focused code context), or raw (full source)"),
+      max_results: z.number().int().min(1).max(100).optional().describe("Maximum results to return (default depends on view: more for sketch, fewer for implementation/raw)"),
+      token_budget: z.number().int().min(100).max(50000).optional().describe("Maximum tokens in response (default depends on view: sketch < implementation < raw)"),
     },
     async ({ query, repo_path, filters, view, max_results, token_budget }) => {
       const result = await search(

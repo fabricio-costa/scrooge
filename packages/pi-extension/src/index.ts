@@ -1,11 +1,12 @@
 /**
  * Scrooge pi.dev Extension
  *
- * Registers Scrooge's 8 code intelligence tools in pi.dev's tool system.
+ * Registers Scrooge's 10 code intelligence tools in pi.dev's tool system.
  * Each tool delegates to the shared API layer with channel: "pi" for telemetry.
  *
- * Also registers a tool_call hook for automatic context injection before
- * write/edit operations on supported file types.
+ * Also registers hooks for automatic context injection before write/edit
+ * operations, native-exploration guardrails before read/grep/glob, and
+ * observability after tool execution.
  *
  * Installation:
  *   pi install /path/to/scrooge/packages/pi-extension
@@ -16,24 +17,22 @@ import { execSync } from "node:child_process";
 import { appendFileSync, existsSync, mkdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { status as scroogeStatus } from "scrooge/api";
-import { search, lookup, map, reindex, status, statistics, context, deps } from "scrooge/api";
+import { search, lookup, source, map, reindex, status, statistics, context, deps } from "scrooge/api";
 import type { Channel } from "scrooge/api";
+import {
+  buildObservedRecord,
+  createSessionState,
+  getGuardrailDecision,
+  getToolInputPath,
+  MAX_NUDGES,
+  type SessionState,
+} from "./adoption.js";
 
 const CHANNEL: Channel = "pi";
 
 const SUPPORTED_EXTENSIONS = ["kt", "ts", "tsx", "dart", "py"];
-const CODE_EXTENSIONS = ["kt", "ts", "tsx", "js", "jsx", "dart", "py", "rb", "go", "rs", "java"];
-
-const NUDGE_MESSAGES: Record<string, string> = {
-  read: "Scrooge tip: scrooge_lookup finds a symbol's definition and all usages in one call. Try it before reading multiple files.",
-  grep: "Scrooge tip: scrooge_search returns ranked, sketch-compressed results across the entire codebase. Try scrooge_search instead of grep for code exploration.",
-  glob: "Scrooge tip: scrooge_map provides a hierarchical repo overview with summaries. Try scrooge_map instead of glob for understanding project structure.",
-};
-
-const MAX_NUDGES = 3;
-let nudgeCount = 0;
 let repoIndexedCache: boolean | null = null;
+const sessionStates = new Map<string, SessionState>();
 
 async function isRepoIndexed(): Promise<boolean> {
   if (repoIndexedCache !== null) return repoIndexedCache;
@@ -45,7 +44,7 @@ async function isRepoIndexed(): Promise<boolean> {
   }
 
   try {
-    const result = await scroogeStatus(
+    const result = await status(
       { channel: CHANNEL, repoPath: undefined, model: process.env.SCROOGE_MODEL },
     );
     repoIndexedCache = (result.total_chunks ?? 0) > 0;
@@ -55,40 +54,68 @@ async function isRepoIndexed(): Promise<boolean> {
   return repoIndexedCache;
 }
 
-async function maybeNudge(toolName: string, event: Record<string, unknown>): Promise<{ additionalContext: string } | undefined> {
-  if (nudgeCount >= MAX_NUDGES) return;
-
-  // For read: only nudge on code files
-  if (toolName === "read") {
-    const input = event.input as Record<string, unknown> | undefined;
-    const filePath = input?.file_path as string | undefined;
-    if (filePath) {
-      const ext = filePath.split(".").pop();
-      if (!ext || !CODE_EXTENSIONS.includes(ext)) return;
-    }
+function getSessionId(ctx: unknown): string {
+  const sessionManager = (ctx as { sessionManager?: { getSessionId?: () => string } } | undefined)?.sessionManager;
+  try {
+    const sessionId = sessionManager?.getSessionId?.();
+    if (sessionId) return sessionId;
+  } catch {
+    // Ignore and fall back below
   }
+  return `${process.pid}:${process.cwd()}`;
+}
 
+function getRepoPath(ctx: unknown): string {
+  const cwd = (ctx as { cwd?: string } | undefined)?.cwd;
+  return typeof cwd === "string" && cwd.trim() ? cwd : process.cwd();
+}
+
+function getSessionState(sessionId: string): SessionState {
+  let state = sessionStates.get(sessionId);
+  if (!state) {
+    state = createSessionState();
+    sessionStates.set(sessionId, state);
+  }
+  return state;
+}
+
+async function maybeGuardrail(
+  toolName: string,
+  input: Record<string, unknown> | undefined,
+  state: SessionState,
+): Promise<{ additionalContext: string } | { block: true; reason: string } | undefined> {
   const indexed = await isRepoIndexed();
   if (!indexed) return;
 
-  const message = NUDGE_MESSAGES[toolName];
-  if (!message) return;
+  const decision = getGuardrailDecision(toolName, input, state);
+  if (!decision) return;
 
-  nudgeCount++;
-  return { additionalContext: message };
+  if (decision.action === "block") {
+    return { block: true, reason: decision.message };
+  }
+
+  if (decision.rateLimited && state.nudgeCount >= MAX_NUDGES) return;
+
+  if (decision.rateLimited) {
+    state.nudgeCount += 1;
+  }
+
+  return { additionalContext: decision.message };
 }
 
-function observeToolCall(toolName: string): void {
+function observeToolResult(
+  toolName: string,
+  input: Record<string, unknown> | undefined,
+  repoPath: string,
+  sessionId: string,
+  state: SessionState,
+): void {
   try {
     const scroogeDir = join(homedir(), ".scrooge");
     mkdirSync(scroogeDir, { recursive: true });
-    const record = JSON.stringify({
-      t: new Date().toISOString(),
-      tool: `pi:${toolName}`,
-      repo: process.cwd(),
-      sid: "",
-    });
-    appendFileSync(join(scroogeDir, "observed.jsonl"), record + "\n");
+
+    const record = buildObservedRecord(toolName, repoPath, sessionId, input, state);
+    appendFileSync(join(scroogeDir, "observed.jsonl"), JSON.stringify(record) + "\n");
   } catch {
     /* silent */
   }
@@ -121,7 +148,7 @@ export default function (pi: PiExtensionAPI): void {
     name: "scrooge_search",
     label: "Scrooge Search",
     description:
-      "Hybrid code search (lexical + vector) across an indexed repository. Returns ranked chunks with token-budgeted snippets.",
+      "Hybrid code search with query rewriting, lexical + vector retrieval, and heuristic reranking across an indexed repository. Returns ranked chunks with token-budgeted snippets. Use sketch for planning, implementation for focused code understanding, and raw for full source.",
     parameters: Type.Object({
       query: Type.String({ minLength: 1, maxLength: 1000, description: "Search query" }),
       repo_path: Type.Optional(Type.String({ maxLength: 500, description: "Absolute path to the repository" })),
@@ -133,7 +160,9 @@ export default function (pi: PiExtensionAPI): void {
           tags: Type.Optional(Type.Array(Type.String())),
         }),
       ),
-      view: Type.Optional(Type.Union([Type.Literal("sketch"), Type.Literal("raw")])),
+      view: Type.Optional(
+        Type.Union([Type.Literal("sketch"), Type.Literal("implementation"), Type.Literal("raw")]),
+      ),
       max_results: Type.Optional(Type.Integer({ minimum: 1, maximum: 100 })),
       token_budget: Type.Optional(Type.Integer({ minimum: 100, maximum: 50000 })),
     }),
@@ -142,7 +171,7 @@ export default function (pi: PiExtensionAPI): void {
         {
           query: params.query as string,
           filters: params.filters as Record<string, unknown> | undefined,
-          view: params.view as "sketch" | "raw" | undefined,
+          view: params.view as "sketch" | "implementation" | "raw" | undefined,
           maxResults: params.max_results as number | undefined,
           tokenBudget: params.token_budget as number | undefined,
         },
@@ -167,6 +196,37 @@ export default function (pi: PiExtensionAPI): void {
         {
           symbol: params.symbol as string,
           includeUsages: params.include_usages as boolean | undefined,
+        },
+        { channel: CHANNEL, repoPath: params.repo_path as string | undefined, model: process.env.SCROOGE_MODEL },
+      );
+      return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }], details: {} };
+    },
+  });
+
+  // --- scrooge_source ---
+  pi.registerTool({
+    name: "scrooge_source",
+    label: "Scrooge Source",
+    description:
+      "Get the exact raw source for a known chunk or symbol. Use this instead of reading a whole file when you already know what implementation you need.",
+    parameters: Type.Object({
+      chunk_id: Type.Optional(Type.String({ minLength: 1, maxLength: 200, description: "Exact chunk ID" })),
+      symbol: Type.Optional(Type.String({ minLength: 1, maxLength: 200, description: "Symbol name" })),
+      before: Type.Optional(Type.Integer({ minimum: 0, maximum: 200, description: "Extra lines before the chunk" })),
+      after: Type.Optional(Type.Integer({ minimum: 0, maximum: 200, description: "Extra lines after the chunk" })),
+      repo_path: Type.Optional(Type.String({ maxLength: 500 })),
+    }),
+    async execute(_toolCallId, params) {
+      if (!params.chunk_id && !params.symbol) {
+        throw new Error("Provide chunk_id or symbol");
+      }
+
+      const result = await source(
+        {
+          chunkId: params.chunk_id as string | undefined,
+          symbol: params.symbol as string | undefined,
+          before: params.before as number | undefined,
+          after: params.after as number | undefined,
         },
         { channel: CHANNEL, repoPath: params.repo_path as string | undefined, model: process.env.SCROOGE_MODEL },
       );
@@ -240,13 +300,20 @@ export default function (pi: PiExtensionAPI): void {
       period: Type.Optional(
         Type.Union([Type.Literal("today"), Type.Literal("week"), Type.Literal("month"), Type.Literal("all")]),
       ),
+      format: Type.Optional(Type.Union([Type.Literal("text"), Type.Literal("json")])),
     }),
     async execute(_toolCallId, params) {
       const result = await statistics(
-        { period: params.period as "today" | "week" | "month" | "all" | undefined },
+        {
+          period: params.period as "today" | "week" | "month" | "all" | undefined,
+          format: params.format as "text" | "json" | undefined,
+        },
         { channel: CHANNEL, repoPath: params.repo_path as string | undefined, model: process.env.SCROOGE_MODEL },
       );
-      return { content: [{ type: "text", text: result.report }], details: {} };
+      return {
+        content: [{ type: "text", text: params.format === "json" ? JSON.stringify(result.data, null, 2) : result.report }],
+        details: params.format === "json" ? result.data : {},
+      };
     },
   });
 
@@ -298,20 +365,34 @@ export default function (pi: PiExtensionAPI): void {
     },
   });
 
-  // --- Automatic context injection hook ---
-  pi.on("tool_call", async (event) => {
+  // --- Observability after tool execution (matches Claude PostToolUse semantics) ---
+  pi.on("tool_result", async (event, ctx) => {
     const toolName = event.toolName as string | undefined;
-    if (toolName) observeToolCall(toolName);
+    if (!toolName) return;
 
-    // Nudge for exploration tools
+    const sessionId = getSessionId(ctx);
+    const repoPath = getRepoPath(ctx);
+    const state = getSessionState(sessionId);
+    observeToolResult(toolName, event.input as Record<string, unknown> | undefined, repoPath, sessionId, state);
+  });
+
+  // --- Automatic context injection + native-exploration guardrails ---
+  pi.on("tool_call", async (event, ctx) => {
+    const toolName = event.toolName as string | undefined;
+    if (!toolName) return;
+
+    const sessionId = getSessionId(ctx);
+    const state = getSessionState(sessionId);
+
     if (toolName === "read" || toolName === "grep" || toolName === "glob") {
-      return maybeNudge(toolName, event);
+      const decision = await maybeGuardrail(toolName, event.input as Record<string, unknown> | undefined, state);
+      if (decision) return decision;
     }
 
     if (toolName !== "write" && toolName !== "edit") return;
 
     const input = event.input as Record<string, unknown> | undefined;
-    const filePath = input?.file_path as string | undefined;
+    const filePath = getToolInputPath(input);
     if (!filePath) return;
 
     const ext = filePath.split(".").pop();

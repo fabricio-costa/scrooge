@@ -79,6 +79,7 @@
 - **`scrooge_search`** — Hybrid code search combining FTS5 lexical and sqlite-vec vector search with Reciprocal Rank Fusion
 - **`scrooge_map`** — Repository map with directory tree and hierarchical summaries at repo, module, or file level
 - **`scrooge_lookup`** — Symbol lookup: find definitions and all usages across the codebase
+- **`scrooge_source`** — Exact chunk/symbol source retrieval without opening the whole file
 - **`scrooge_context`** — Project patterns for a chunk kind: common annotations, tags, imports, and example sketches
 - **`scrooge_deps`** — Compact dependency graph: forward (what a symbol uses) and reverse (who uses it)
 - **`scrooge_reindex`** — Trigger full or incremental indexing of a repository
@@ -188,7 +189,7 @@ Shows how much Scrooge saved by comparing compressed responses to raw content co
 
 ### scrooge_search
 
-Hybrid code search combining FTS5 lexical search and sqlite-vec vector search with RRF fusion.
+Hybrid code search combining query rewriting, FTS5 lexical search, sqlite-vec vector search, and a light heuristic reranker on top of RRF fusion.
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
@@ -198,9 +199,9 @@ Hybrid code search combining FTS5 lexical search and sqlite-vec vector search wi
 | `filters.language` | string | no | — | Language: `kotlin`, `typescript`, `dart`, `python`, `xml`, `gradle` |
 | `filters.kind` | string | no | — | Chunk kind: `class`, `function`, `composable`, etc. |
 | `filters.tags` | string[] | no | — | Tags: `["hilt", "compose"]` |
-| `view` | string | no | `"sketch"` | `"sketch"` (compressed) or `"raw"` (full source) |
-| `max_results` | number | no | 8 | Maximum number of results |
-| `token_budget` | number | no | 3000 | Max tokens in response |
+| `view` | string | no | `"sketch"` | `"sketch"` (compressed), `"implementation"` (focused code context), or `"raw"` (full source) |
+| `max_results` | number | no | depends on view | Maximum number of results |
+| `token_budget` | number | no | depends on view | Max tokens in response |
 
 **Example response:**
 
@@ -239,6 +240,41 @@ Find a symbol's definition and all usages across the codebase.
 | `symbol` | string | yes | — | Symbol name (e.g. `"LoginViewModel"`) |
 | `repo_path` | string | no | cwd | Path to the repository |
 | `include_usages` | boolean | no | `true` | Include usage locations |
+
+### scrooge_source
+
+Fetch the exact raw source for a known chunk or symbol, without opening the whole file.
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `chunk_id` | string | no* | — | Exact chunk ID returned by `scrooge_search` or `scrooge_lookup` |
+| `symbol` | string | no* | — | Symbol name to fetch raw source for |
+| `before` | number | no | `0` | Extra lines of file context before the chunk |
+| `after` | number | no | `0` | Extra lines of file context after the chunk |
+| `repo_path` | string | no | cwd | Path to the repository |
+
+\* Provide at least one of `chunk_id` or `symbol`.
+
+**Example response:**
+
+```json
+{
+  "chunkId": "app/src/main/LoginViewModel.kt:1-30:abc123",
+  "before": 0,
+  "after": 0,
+  "chunks": [
+    {
+      "id": "app/src/main/LoginViewModel.kt:1-30:abc123",
+      "path": "app/src/main/LoginViewModel.kt",
+      "lines": "1-30",
+      "kind": "viewmodel",
+      "symbol": "LoginViewModel",
+      "signature": "class LoginViewModel @Inject constructor() : ViewModel()",
+      "source": "class LoginViewModel @Inject constructor() : ViewModel() { ... }"
+    }
+  ]
+}
+```
 
 ### scrooge_reindex
 
@@ -311,6 +347,7 @@ Usage and token savings metrics.
 |-----------|------|----------|---------|-------------|
 | `repo_path` | string | no | cwd | Path to the repository |
 | `period` | string | no | `"all"` | `"today"`, `"week"`, `"month"`, or `"all"` |
+| `format` | string | no | `"text"` | `"text"` for the human report or `"json"` for structured dashboard-friendly output |
 
 **Example output:**
 
@@ -340,11 +377,25 @@ Avg results/query: 5.2 | Avg tokens/query: 1,076
 Sources: lexical 30% | vector 25% | both 45%
 ```
 
+For dashboards or automation, request `format: "json"`:
+
+```json
+{
+  "repo": { "path": "/Users/alice/projects/kotlin-pdv", "name": "kotlin-pdv" },
+  "period": { "key": "all", "label": "all time (since 2026-02-20)", "since": null, "firstCallAt": "2026-02-20 09:15:00" },
+  "totals": { "totalCalls": 70, "tokensDelivered": 45200, "rawEquivalent": 120000, "tokensSaved": 74800, "savingsPct": 62.3 },
+  "usageByTool": [{ "tool": "search", "callCount": 42, "tokensSent": 1200, "tokensRaw": 8500, "tokensSaved": 7300, "savingsPct": 85.9 }],
+  "coverage": { "coveragePct": 81.4, "grepBypasses": [{ "selector": "AuthRepository", "count": 3 }], "bypassReasons": [{ "reasonCode": "known_path_regex", "count": 2 }] }
+}
+```
+
 **Environment variables:**
 
 | Variable | Description |
 |----------|-------------|
 | `SCROOGE_MODEL` | AI model identifier (e.g., `claude-opus-4-6`). Recorded in telemetry for per-model usage breakdown in `scrooge_statistics`. |
+| `SCROOGE_NATIVE_EXPLORATION_POLICY` | Guardrail mode for native `Read`/`Grep`/`Glob` on indexed repos: `off`, `warn` (default), or `strict`. `strict` blocks blind code exploration while still allowing non-code reads, regex on a known path, and guided follow-up reads. |
+| `SCROOGE_NATIVE_EXPLORATION_OVERRIDE_REASON` | Optional operator override reason code for intentional native bypasses: `known_raw_content`, `known_path_regex`, `non_code_file`, or `final_verification`. Recorded in `observed.jsonl` diagnostics when applicable. |
 
 ## Hooks
 
@@ -354,10 +405,12 @@ Scrooge registers several hooks to integrate seamlessly with agent workflows. `n
 |------|---------|---------|
 | **SessionStart** | Session begins | Injects index summary + tool preference directives for indexed repos |
 | **PreToolUse** (Write\|Edit) | Before file writes | Injects project patterns (annotations, imports, sketches) |
-| **PreToolUse** (Read\|Grep\|Glob) | Before exploration | Suggests Scrooge alternatives (rate-limited: 3/session) |
+| **PreToolUse** (Read\|Grep\|Glob) | Before exploration | Applies native-exploration guardrails: `warn` nudges toward Scrooge (rate-limited: 3/session), `strict` blocks blind code exploration |
 | **PostToolUse** | After any tool call | Records tool usage to `~/.scrooge/observed.jsonl` for coverage metrics |
 
 All hooks return `{}` for non-indexed repos (zero overhead) and fail silently on timeout.
+
+For native exploration guardrails, set `SCROOGE_NATIVE_EXPLORATION_POLICY=off|warn|strict`. The default is `warn`. In `strict`, blind `Read`/`Grep`/`Glob` calls are blocked on indexed repos, while non-code reads, regex on a known path, and guided follow-up reads remain allowed.
 
 <details>
 <summary>Manual hook configuration (Claude Code)</summary>
@@ -390,7 +443,7 @@ Add to `~/.claude/settings.json` (user scope) or your project's `.claude/setting
 
 ### pi.dev
 
-The pi.dev extension handles all hooks automatically via the `tool_call` event — no additional configuration needed. During installation, `npm run setup` also appends Scrooge instructions to `~/.pi/agent/AGENTS.md` (with HTML markers for safe updates/removal).
+The pi.dev extension handles all hooks automatically via `tool_call` and `tool_result` events — no additional configuration needed. During installation, `npm run setup` also appends Scrooge instructions to `~/.pi/agent/AGENTS.md` (with HTML markers for safe updates/removal).
 
 </details>
 
@@ -401,14 +454,14 @@ bin/
 ├── scrooge-mcp.mjs       # MCP launcher (auto-rebuilds native modules if needed)
 ├── scrooge-session.mjs   # SessionStart hook — injects index summary + directives
 ├── scrooge-hook.mjs      # PreToolUse hook — injects project patterns for Write/Edit
-├── scrooge-nudge.mjs     # PreToolUse hook — suggests Scrooge alternatives for Read/Grep/Glob
+├── scrooge-nudge.mjs     # PreToolUse hook — warn/strict guardrails for Read/Grep/Glob
 ├── scrooge-observe.mjs   # PostToolUse hook — records tool calls for coverage metrics
 ├── setup.mjs             # One-command setup: build, register, configure hooks
 └── uninstall.mjs         # Clean removal of all registrations and hooks
 templates/
 └── agent-instructions.md # Reusable Scrooge tool preference template
 packages/
-└── pi-extension/         # pi.dev extension: tools + hooks via tool_call event
+└── pi-extension/         # pi.dev extension: tools + hooks via tool_call/tool_result events
 src/
 ├── index.ts              # Entry point — starts MCP server
 ├── api/                  # Transport-agnostic API layer (shared by MCP + pi.dev)
@@ -416,6 +469,7 @@ src/
 │   ├── types.ts          # Shared request/response interfaces, Channel type
 │   ├── search.ts         # search() — orchestrates hybrid search + telemetry
 │   ├── lookup.ts         # lookup() — symbol definitions + usages + telemetry
+│   ├── source.ts         # source() — exact chunk/symbol source + telemetry
 │   ├── map.ts            # map() — repo tree + summaries + telemetry
 │   ├── context.ts        # context() — project pattern aggregation + telemetry
 │   ├── deps.ts           # deps() — dependency graph extraction + telemetry
@@ -431,8 +485,9 @@ src/
 │   ├── chunkers/         # Language-specific chunkers (tree-sitter for Kotlin/TypeScript/Dart/Python, regex for others)
 │   └── sketcher.ts       # Compresses chunks into token-efficient sketches
 ├── retrieval/
-│   ├── hybrid.ts         # Orchestrates lexical + vector search with RRF fusion
-│   ├── lexical.ts        # FTS5 full-text search with CamelCase splitting
+│   ├── hybrid.ts         # Orchestrates lexical + vector search with RRF fusion + heuristic reranking
+│   ├── lexical.ts        # FTS5 lexical search with query variants and symbol/path heuristics
+│   ├── query.ts          # Query planning: stop-word cleanup, alias expansion, exact-term extraction
 │   ├── vector.ts         # sqlite-vec cosine similarity search
 │   └── packager.ts       # Token-budgeted result packaging with diversity constraints
 ├── repomap/
@@ -535,33 +590,43 @@ When auto-reindex occurs, a `_note` field is included in the response with timin
 ```
 Query
   │
-  ├──────────────┬────────────────┐
-  ▼              ▼                │
-┌─────┐    ┌──────────┐          │
-│FTS5 │    │sqlite-vec│          │
-│lexic│    │  vector  │          │
-└──┬──┘    └────┬─────┘          │
-   │            │                │
-   ▼            ▼                │
- ┌──────────────────┐            │
- │   RRF Fusion     │            │
- │ (k=60, weighted) │            │
- └────────┬─────────┘            │
-          ▼                      │
-  ┌───────────────┐     ┌───────┴───────┐
-  │  Packager     │◀────│ Token Budget  │
-  │ (diversity +  │     │   (default    │
-  │  dedup)       │     │    3000)      │
-  └───────┬───────┘     └───────────────┘
-          ▼
-    Ranked results
-    (sketch or raw)
+  ▼
+┌──────────────────────┐
+│ Query planner        │
+│ - stop-word cleanup  │
+│ - CamelCase splitting│
+│ - alias expansion    │
+└──────────┬───────────┘
+           │
+  ┌────────┴────────┬────────────────┐
+  ▼                 ▼                │
+┌──────────┐   ┌──────────┐          │
+│ FTS5     │   │sqlite-vec│          │
+│ lexical  │   │  vector  │          │
+└────┬─────┘   └────┬─────┘          │
+     │              │                │
+     ▼              ▼                │
+  ┌──────────────────────┐           │
+  │  RRF + reranker      │           │
+  │  exact symbol/path   │           │
+  │  + kind/lang hints   │           │
+  └──────────┬───────────┘           │
+             ▼                       │
+     ┌───────────────┐      ┌───────┴───────┐
+     │  Packager     │◀─────│ Token Budget  │
+     │ (diversity +  │      │   (default    │
+     │  dedup)       │      │    3000)      │
+     └───────┬───────┘      └───────────────┘
+             ▼
+       Ranked results
+       (sketch / implementation / raw)
 ```
 
-1. **Lexical search** — FTS5 full-text search with BM25 ranking. Queries are tokenized with CamelCase splitting (`LoginViewModel` → `login OR view OR model OR loginviewmodel`) so both exact identifiers and sub-words match. Supports filtering by module, language, kind, and tags
-2. **Vector search** — The query is embedded with MiniLM-L6-v2 and compared against all chunk vectors via sqlite-vec cosine distance. Results are ranked by similarity (1 - distance). Same filters apply post-query
-3. **RRF Fusion** — Both ranked lists are merged using Reciprocal Rank Fusion: `score(doc) = Σ 1/(k + rank)` where `k=60`. Documents appearing in both lists accumulate scores from each, naturally rising to the top
-4. **Packaging** — Results are packed within a token budget (default 3000). A diversity constraint limits each file to at most 3 chunks, preventing a single large file from dominating results. In `sketch` view, the compressed sketch is returned; in `raw` view, full source code
+1. **Query planning** — Scrooge strips stop words, splits CamelCase, preserves exact identifier variants, and expands common code aliases such as `vm → viewmodel`, `repo → repository`, and plural forms like `repositories → repository`
+2. **Lexical retrieval** — FTS5 full-text search still provides the main lexical ranking, but Scrooge now runs exact/strict/broad query variants and a symbol/path heuristic pass so known identifiers and filenames surface earlier
+3. **Vector search** — The query is embedded with MiniLM-L6-v2 and compared against all chunk vectors via sqlite-vec cosine distance. Results are ranked by similarity (1 - distance). Same filters apply post-query
+4. **Fusion + reranking** — Lexical and vector lists are merged using Reciprocal Rank Fusion: `score(doc) = Σ 1/(k + rank)` where `k=60`, then lightly reranked with exact symbol/path matches, term coverage, and kind/language hints
+5. **Packaging** — Results are packed within a token budget (default 3000). A diversity constraint limits each file to at most 3 chunks, preventing a single large file from dominating results. `sketch` is best for planning, `implementation` for focused code understanding, and `raw` for full source
 
 ## Configuration
 

@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { openDb, insertChunk } from "../src/storage/db.js";
 import { lexicalSearch } from "../src/retrieval/lexical.js";
 import { packageResults } from "../src/retrieval/packager.js";
+import { buildSearchQueryPlan } from "../src/retrieval/query.js";
 import type Database from "better-sqlite3";
 import type { SearchResult } from "../src/retrieval/lexical.js";
 
@@ -93,6 +94,25 @@ afterEach(() => {
   db.close();
 });
 
+describe("query planning", () => {
+  it("expands aliases and removes stop words", () => {
+    const plan = buildSearchQueryPlan("how does vm repo work");
+
+    expect(plan.terms).toEqual(["vm", "repo", "work"]);
+    expect(plan.expansionTerms).toContain("viewmodel");
+    expect(plan.expansionTerms).toContain("repository");
+    expect(plan.aliasesUsed).toContain("vm->viewmodel");
+    expect(plan.aliasesUsed).toContain("repo->repository");
+    expect(plan.variants.map((variant) => variant.name)).toContain("expanded");
+  });
+
+  it("adds singular forms for plural queries", () => {
+    const plan = buildSearchQueryPlan("repositories");
+
+    expect(plan.expansionTerms).toContain("repository");
+  });
+});
+
 describe("lexical search", () => {
   it("should find chunks by symbol name", () => {
     const results = lexicalSearch(db, REPO_PATH, "LoginViewModel");
@@ -148,6 +168,21 @@ describe("lexical search", () => {
     expect(results.length).toBeGreaterThan(0);
   });
 
+  it("should expand vm to viewmodel via heuristic matching", () => {
+    const results = lexicalSearch(db, REPO_PATH, "vm");
+
+    expect(results.length).toBeGreaterThan(0);
+    expect(results[0].chunk.symbol_name).toBe("LoginViewModel");
+    expect(results[0].metadata?.lexicalVariants).toContain("symbol_path");
+  });
+
+  it("should singularize plural queries for symbol matching", () => {
+    const results = lexicalSearch(db, REPO_PATH, "repositories");
+
+    expect(results.length).toBeGreaterThan(0);
+    expect(results[0].chunk.symbol_name).toBe("AuthRepository");
+  });
+
   it("should respect limit parameter", () => {
     const results = lexicalSearch(db, REPO_PATH, "login", {}, 1);
     expect(results.length).toBe(1);
@@ -163,21 +198,21 @@ describe("context packager", () => {
           repo_path: REPO_PATH,
           commit_sha: "abc",
           path: "file1.kt",
-          module: null,
+          module: ":app",
           source_set: null,
           language: "kotlin",
           kind: "class",
           symbol_name: "Foo",
           symbol_fqname: null,
-          signature: null,
+          signature: "class Foo(private val repo: AuthRepository)",
           start_line: 1,
           end_line: 10,
-          text_raw: "a".repeat(400),
-          text_sketch: "class Foo",
+          text_raw: "@Inject\nclass Foo(private val repo: AuthRepository) {\n  fun login(email: String, password: String) {\n    repo.authenticate(email, password)\n  }\n}",
+          text_sketch: "class Foo\n  fun login(email: String, password: String)",
           tags: null,
-          annotations: null,
+          annotations: JSON.stringify(["@Inject"]),
           defines: null,
-          uses: null,
+          uses: JSON.stringify(["AuthRepository", "authenticate"]),
           content_hash: "h1",
           created_at: "",
         },
@@ -246,9 +281,9 @@ describe("context packager", () => {
 
   it("should package results within token budget", () => {
     const results = makeMockResults();
-    const packaged = packageResults(results, "sketch", 100);
+    const packaged = packageResults(results, "sketch", 300);
 
-    expect(packaged.totalTokens).toBeLessThanOrEqual(100);
+    expect(packaged.totalTokens).toBeLessThanOrEqual(300);
     expect(packaged.results.length).toBeGreaterThan(0);
   });
 
@@ -266,8 +301,30 @@ describe("context packager", () => {
     const results = makeMockResults();
     const packaged = packageResults(results, "raw", 10000);
 
-    const hasRaw = packaged.results.some((r) => r.snippet.length >= 400);
+    const hasRaw = packaged.results.some((r) => r.snippet.includes("repo.authenticate(email, password)"));
     expect(hasRaw).toBe(true);
+  });
+
+  it("should expose richer metadata in packaged results", () => {
+    const results = makeMockResults();
+    const packaged = packageResults(results, "sketch", 1000, "login auth");
+
+    expect(packaged.results[0].id).toBe("1");
+    expect(packaged.results[0].module).toBe(":app");
+    expect(packaged.results[0].language).toBe("kotlin");
+    expect(packaged.results[0].signature).toContain("class Foo");
+    expect(packaged.results[0].uses).toContain("AuthRepository");
+    expect(packaged.results[0].highlights).toContain("fun login(email: String, password: String) {");
+  });
+
+  it("should build implementation view with focused code context", () => {
+    const results = makeMockResults();
+    const packaged = packageResults(results, "implementation", 1000, "authenticate login");
+
+    expect(packaged.results[0].snippet).toContain("class Foo(private val repo: AuthRepository)");
+    expect(packaged.results[0].snippet).toContain("repo.authenticate(email, password)");
+    expect(packaged.results[0].snippet).toContain("Uses: AuthRepository, authenticate");
+    expect(packaged.results[0].snippet.length).toBeLessThan(results[0].chunk.text_raw.length + 80);
   });
 
   it("should apply diversity constraint (max per file)", () => {

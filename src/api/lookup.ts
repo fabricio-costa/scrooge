@@ -8,11 +8,14 @@ import type { ApiContext, LookupParams, LookupResponse, LookupChunk } from "./ty
 
 function formatChunk(chunk: ChunkRow): LookupChunk {
   return {
+    id: chunk.id,
     path: chunk.path,
     lines: `${chunk.start_line}-${chunk.end_line}`,
     kind: chunk.kind,
     symbol: chunk.symbol_name,
     module: chunk.module,
+    language: chunk.language,
+    signature: chunk.signature,
     sketch: chunk.text_sketch,
   };
 }

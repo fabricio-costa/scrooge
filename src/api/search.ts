@@ -1,7 +1,7 @@
 import { openDb, recordToolCall } from "../storage/db.js";
 import { getConfig } from "../utils/config.js";
 import { hybridSearch } from "../retrieval/hybrid.js";
-import { packageResults, type ViewMode } from "../retrieval/packager.js";
+import { getDefaultTokenBudget, packageResults, type ViewMode } from "../retrieval/packager.js";
 import { estimateTokens } from "../utils/tokens.js";
 import { ensureFreshIndex, formatReindexNote } from "../utils/freshness.js";
 import { validateRepoPath } from "../utils/path-validation.js";
@@ -20,6 +20,9 @@ export async function search(
     const freshness = await ensureFreshIndex(db, repoPath);
     const freshnessEnd = Date.now();
 
+    const viewMode: ViewMode = params.view ?? "sketch";
+    const maxResults = params.maxResults ?? getDefaultMaxResults(viewMode, config.defaultMaxResults);
+
     const { results, metrics } = await hybridSearch(
       db,
       repoPath,
@@ -30,15 +33,15 @@ export async function search(
         kind: params.filters?.kind,
         tags: params.filters?.tags,
       },
-      params.maxResults ?? config.defaultMaxResults,
+      maxResults,
     );
     const searchEnd = Date.now();
 
-    const viewMode: ViewMode = params.view ?? "sketch";
     const packaged = packageResults(
       results,
       viewMode,
-      params.tokenBudget ?? config.defaultTokenBudget,
+      params.tokenBudget,
+      params.query,
     );
 
     const tokensRaw = results
@@ -50,6 +53,15 @@ export async function search(
     }
 
     const reindexNote = formatReindexNote(freshness);
+    const rewrite = metrics.query ?? {
+      terms: [],
+      exactTerms: [],
+      expansions: [],
+      aliasesUsed: [],
+      variants: [],
+      languageHints: [],
+      kindHints: [],
+    };
 
     recordToolCall(db, {
       tool: "search",
@@ -64,6 +76,8 @@ export async function search(
         resultCount: packaged.results.length,
         truncated: packaged.truncated,
         view: viewMode,
+        maxResults,
+        tokenBudget: params.tokenBudget ?? getDefaultTokenBudget(viewMode, config.defaultTokenBudget),
         sources,
         autoReindexed: freshness.reindexed,
         timing: {
@@ -77,15 +91,31 @@ export async function search(
           candidatesBeforeFusion: metrics.candidatesBeforeFusion,
           rrfK: metrics.rrfK,
         },
+        rewrite: {
+          terms: rewrite.terms,
+          exactTerms: rewrite.exactTerms,
+          expansions: rewrite.expansions,
+          aliasesUsed: rewrite.aliasesUsed,
+          variants: rewrite.variants,
+          languageHints: rewrite.languageHints,
+          kindHints: rewrite.kindHints,
+        },
+        rerank: {
+          rerankedCount: metrics.rerankedCount ?? 0,
+        },
         packager: {
           diversityRejected: packaged.stats.diversityRejected,
           uniqueFiles: packaged.stats.uniqueFiles,
           budgetUtilization: packaged.stats.tokenBudgetUtilization,
         },
         topScores: metrics.scores.slice(0, 5).map((s) => ({
-          rrf: Math.round(s.rrfScore * 100000) / 100000,
+          rrf: Math.round((s.rrfScore ?? 0) * 100000) / 100000,
+          rerank: Math.round((s.rerankScore ?? 0) * 100000) / 100000,
+          final: Math.round((s.finalScore ?? s.rrfScore ?? 0) * 100000) / 100000,
           lex_rank: s.lexicalRank,
           vec_rank: s.vectorRank,
+          variants: s.lexicalVariants ?? [],
+          reasons: s.reasons ?? [],
         })),
       },
     });
@@ -99,5 +129,17 @@ export async function search(
     };
   } finally {
     db.close();
+  }
+}
+
+function getDefaultMaxResults(view: ViewMode, baseMaxResults: number): number {
+  switch (view) {
+    case "implementation":
+      return Math.max(4, Math.ceil(baseMaxResults / 2));
+    case "raw":
+      return Math.max(3, Math.ceil(baseMaxResults / 2));
+    case "sketch":
+    default:
+      return baseMaxResults;
   }
 }

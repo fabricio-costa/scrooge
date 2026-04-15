@@ -7,9 +7,14 @@ export interface SearchFilter {
   tags?: string[];
 }
 
+export interface SearchResultMetadata {
+  lexicalVariants?: string[];
+}
+
 export interface SearchResult {
   chunk: ChunkRow;
   score: number;
   source: "lexical" | "vector" | "both";
   rank: number;
+  metadata?: SearchResultMetadata;
 }

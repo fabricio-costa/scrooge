@@ -25,15 +25,39 @@ vi.mock("../src/api/lookup.js", () => ({
     symbol: "LoginViewModel",
     definitions: [
       {
+        id: "c-login",
         path: "LoginViewModel.kt",
         lines: "1-30",
         kind: "viewmodel",
         symbol: "LoginViewModel",
         module: ":app",
+        language: "kotlin",
+        signature: "class LoginViewModel()",
         sketch: "class LoginViewModel()",
       },
     ],
     usages: [],
+  }),
+}));
+
+vi.mock("../src/api/source.js", () => ({
+  source: vi.fn().mockResolvedValue({
+    chunkId: "c-login",
+    before: 0,
+    after: 0,
+    chunks: [
+      {
+        id: "c-login",
+        path: "LoginViewModel.kt",
+        lines: "1-30",
+        kind: "viewmodel",
+        symbol: "LoginViewModel",
+        module: ":app",
+        language: "kotlin",
+        signature: "class LoginViewModel()",
+        source: "class LoginViewModel() { fun login() {} }",
+      },
+    ],
   }),
 }));
 
@@ -62,7 +86,45 @@ vi.mock("../src/api/status.js", () => ({
 
 vi.mock("../src/api/statistics.js", () => ({
   statistics: vi.fn().mockResolvedValue({
+    format: "text",
     report: "## Scrooge Statistics\nTokens delivered: 1000\nSaved: 500 (50%)",
+    data: {
+      repo: { path: "/test/repo", name: "scrooge" },
+      period: { key: "all", label: "all time", since: null, firstCallAt: null },
+      generatedAt: "2026-04-14T00:00:00.000Z",
+      empty: false,
+      totals: {
+        totalCalls: 2,
+        tokensDelivered: 1000,
+        rawEquivalent: 1500,
+        tokensSaved: 500,
+        savingsPct: 33.3,
+      },
+      usageByTool: [
+        {
+          tool: "search",
+          callCount: 2,
+          tokensSent: 1000,
+          tokensRaw: 1500,
+          tokensSaved: 500,
+          savingsPct: 33.3,
+        },
+      ],
+      savingsByTool: [
+        {
+          tool: "search",
+          callCount: 2,
+          tokensSent: 1000,
+          tokensRaw: 1500,
+          tokensSaved: 500,
+          savingsPct: 33.3,
+        },
+      ],
+      channels: [{ channel: "mcp", callCount: 2 }],
+      models: [],
+      searchInsights: null,
+      coverage: null,
+    },
   }),
   getDateFilter: vi.fn().mockReturnValue(null),
 }));
@@ -146,7 +208,7 @@ afterAll(async () => {
 });
 
 describe("tool registration", () => {
-  it("lists all 9 tools", async () => {
+  it("lists all 10 tools", async () => {
     const { tools } = await client.listTools();
     const names = tools.map((t) => t.name).sort();
     expect(names).toEqual([
@@ -157,6 +219,7 @@ describe("tool registration", () => {
       "scrooge_map",
       "scrooge_reindex",
       "scrooge_search",
+      "scrooge_source",
       "scrooge_statistics",
       "scrooge_status",
     ]);
@@ -190,6 +253,18 @@ describe("tool invocation", () => {
     const parsed = JSON.parse(first.text) as Record<string, unknown>;
     expect(parsed).toHaveProperty("symbol", "LoginViewModel");
     expect(parsed).toHaveProperty("definitions");
+  });
+
+  it("scrooge_source returns JSON result", async () => {
+    const result = await client.callTool({
+      name: "scrooge_source",
+      arguments: { chunk_id: "c-login" },
+    });
+    const first = (result.content as Array<{ type: string; text: string }>)[0]!;
+    expect(first.type).toBe("text");
+    const parsed = JSON.parse(first.text) as Record<string, unknown>;
+    expect(parsed).toHaveProperty("chunkId", "c-login");
+    expect(parsed).toHaveProperty("chunks");
   });
 
   it("scrooge_map returns text content", async () => {
@@ -235,6 +310,19 @@ describe("tool invocation", () => {
     expect(first.type).toBe("text");
     expect(first.text).toContain("Scrooge Statistics");
     expect(first.text).toContain("Saved");
+  });
+
+  it("scrooge_statistics supports structured json output", async () => {
+    const result = await client.callTool({
+      name: "scrooge_statistics",
+      arguments: { format: "json" },
+    });
+    const first = (result.content as Array<{ type: string; text: string }>)[0]!;
+    expect(first.type).toBe("text");
+    const parsed = JSON.parse(first.text) as Record<string, unknown>;
+    expect(parsed).toHaveProperty("repo");
+    expect(parsed).toHaveProperty("totals");
+    expect(parsed).toHaveProperty("usageByTool");
   });
 
   it("scrooge_context returns JSON result", async () => {
@@ -294,5 +382,15 @@ describe("zod validation", () => {
     expect(result.isError).toBe(true);
     const first = (result.content as Array<{ type: string; text: string }>)[0]!;
     expect(first.text).toMatch(/invalid/i);
+  });
+
+  it("rejects missing selector for scrooge_source", async () => {
+    const result = await client.callTool({
+      name: "scrooge_source",
+      arguments: {},
+    });
+    expect(result.isError).toBe(true);
+    const first = (result.content as Array<{ type: string; text: string }>)[0]!;
+    expect(first.text).toMatch(/chunk_id or symbol/i);
   });
 });

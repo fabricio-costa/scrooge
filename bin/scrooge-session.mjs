@@ -24,6 +24,19 @@ import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { normalizeGuardrailPolicy } from "./hook-state.mjs";
+
+function getPolicySummary() {
+  switch (normalizeGuardrailPolicy()) {
+    case "off":
+      return "Native exploration policy: off — Scrooge is still preferred, but Read/Grep/Glob are not intercepted.";
+    case "strict":
+      return "Native exploration policy: strict — blind code exploration via Read/Grep/Glob is blocked; keep native tools for non-code files, regex on a known path, or guided follow-up reads.";
+    case "warn":
+    default:
+      return "Native exploration policy: warn — blind/native exploration is nudged toward Scrooge first.";
+  }
+}
 
 const DB_PATH = process.env.SCROOGE_DB_PATH || join(homedir(), ".scrooge", "scrooge.db");
 
@@ -66,6 +79,7 @@ async function main() {
       "This repository has not been indexed yet.",
       "Run `scrooge_reindex` to enable code-aware search, symbol lookup, and repo maps.",
       "After indexing, PREFER Scrooge tools over native Read/Grep/Glob for code exploration.",
+      getPolicySummary(),
     ].join("\n");
     process.stdout.write(JSON.stringify({ additionalContext: context }));
     return;
@@ -85,6 +99,7 @@ async function main() {
           "This repository has not been indexed yet.",
           "Run `scrooge_reindex` to enable code-aware search, symbol lookup, and repo maps.",
           "After indexing, PREFER Scrooge tools over native Read/Grep/Glob for code exploration.",
+          getPolicySummary(),
         ].join("\n");
         process.stdout.write(JSON.stringify({ additionalContext: context }));
         return;
@@ -99,11 +114,14 @@ async function main() {
         `Last indexed: ${ago} (commit ${sha}).`,
         "",
         "PREFER Scrooge tools for code exploration:",
-        "- scrooge_search (not Grep) — ranked, sketch-compressed results",
-        "- scrooge_map (not Glob+Read) — hierarchical repo overview",
-        "- scrooge_lookup (not grep for definitions) — symbol def + usages",
-        "- scrooge_deps (not grep for imports) — dependency graph",
-        "Fall back to native Read/Grep only for exact file content or non-code files.",
+        "- If you know the exact symbol: scrooge_lookup first, then scrooge_source for exact code",
+        "- If you know the concept but not the symbol: scrooge_search with view: \"implementation\"",
+        "- If you already know the symbol or chunk ID and want exact code: scrooge_source (not full-file Read)",
+        "- If you need repository structure: scrooge_map (not Glob+Read)",
+        "- If you need refactoring blast radius: scrooge_deps (not grep for imports)",
+        "Do not use Read to discover code. Use Scrooge first, then read only the exact file or slice you need.",
+        "Fall back to native Read/Grep only for exact file content, non-code files, or regex on a known path.",
+        getPolicySummary(),
       ].join("\n");
 
       process.stdout.write(JSON.stringify({ additionalContext: context }));

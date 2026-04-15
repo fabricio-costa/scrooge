@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { openDb, insertChunk, upsertIndexMeta, recordToolCall } from "../src/storage/db.js";
@@ -38,14 +38,16 @@ vi.mock("../src/retrieval/hybrid.js", () => ({
           path: "LoginViewModel.kt",
           kind: "viewmodel",
           symbol_name: "LoginViewModel",
-          text_raw: "class LoginViewModel @Inject constructor() : ViewModel() { fun login() {} }",
+          signature: "class LoginViewModel @Inject constructor() : ViewModel()",
+          text_raw: "class LoginViewModel @Inject constructor() : ViewModel() {\n  fun login() {}\n}",
           text_sketch: "class LoginViewModel()",
           start_line: 1,
           end_line: 30,
           module: ":app",
           language: "kotlin",
           tags: "[]",
-          annotations: "[]",
+          annotations: '["@Inject"]',
+          uses: '["AuthRepository"]',
         },
         score: 0.85,
         source: "both" as const,
@@ -57,14 +59,28 @@ vi.mock("../src/retrieval/hybrid.js", () => ({
       vectorCandidates: 3,
       candidatesBeforeFusion: 8,
       rrfK: 60,
+      rerankedCount: 1,
+      query: {
+        terms: ["login"],
+        exactTerms: [],
+        expansions: [],
+        aliasesUsed: [],
+        variants: ["broad"],
+        languageHints: [],
+        kindHints: [],
+      },
       scores: [
         {
           chunkId: "c1",
           rrfScore: 0.85,
+          rerankScore: 0.02,
+          finalScore: 0.87,
           lexicalRank: 1,
           vectorRank: 2,
           lexicalScore: 0.9,
           vectorDistance: 0.3,
+          lexicalVariants: ["broad"],
+          reasons: ["header_overlap"],
         },
       ],
     },
@@ -76,11 +92,13 @@ vi.mock("../src/retrieval/hybrid.js", () => ({
 // ---------------------------------------------------------------------------
 
 import { lookup } from "../src/api/lookup.js";
+import { source } from "../src/api/source.js";
 import { map } from "../src/api/map.js";
 import { status } from "../src/api/status.js";
 import { health } from "../src/api/health.js";
 import { reindex } from "../src/api/reindex.js";
 import { search } from "../src/api/search.js";
+import { statistics } from "../src/api/statistics.js";
 import { exportData } from "../src/api/export.js";
 import { isGitRepo } from "../src/utils/git.js";
 import { hybridSearch } from "../src/retrieval/hybrid.js";
@@ -129,8 +147,27 @@ function makeChunk(overrides: Record<string, unknown> = {}) {
 // ---------------------------------------------------------------------------
 
 beforeAll(() => {
-  tmpDir = mkdtempSync(join(tmpdir(), "scrooge-api-test-"));
+  tmpDir = realpathSync(mkdtempSync(join(tmpdir(), "scrooge-api-test-")));
   dbPath = join(tmpDir, "test.db");
+
+  mkdirSync(join(tmpDir, "src"), { recursive: true });
+  writeFileSync(
+    join(tmpDir, "src", "ExactSource.ts"),
+    [
+      'import type { Payload } from "./types";',
+      'const prefix = "cw";',
+      "",
+      "export function buildPayload(input: string): Payload {",
+      "  const normalized = input.trim();",
+      "  return { value: `${prefix}:${normalized}` };",
+      "}",
+      "",
+      "export function other(): Payload {",
+      "  return { value: prefix };",
+      "}",
+      "",
+    ].join("\n"),
+  );
 
   const db = openDb(dbPath);
 
@@ -208,6 +245,35 @@ beforeAll(() => {
     }),
   );
 
+  insertChunk(
+    db,
+    makeChunk({
+      id: "c-exact-source",
+      repo_path: tmpDir,
+      path: "src/ExactSource.ts",
+      module: ":app",
+      source_set: "main",
+      language: "typescript",
+      kind: "function",
+      symbol_name: "buildPayload",
+      symbol_fqname: "buildPayload",
+      signature: "export function buildPayload(input: string): Payload",
+      start_line: 4,
+      end_line: 7,
+      text_raw: [
+        "export function buildPayload(input: string): Payload {",
+        "  const normalized = input.trim();",
+        "  return { value: `${prefix}:${normalized}` };",
+        "}",
+      ].join("\n"),
+      text_sketch: "export function buildPayload(input: string): Payload",
+      tags: JSON.stringify([]),
+      annotations: JSON.stringify([]),
+      defines: JSON.stringify(["buildPayload"]),
+      uses: JSON.stringify(["Payload"]),
+    }),
+  );
+
   upsertIndexMeta(db, {
     repo_path: REPO_PATH,
     last_commit_sha: "abc123",
@@ -254,6 +320,9 @@ describe("lookup()", () => {
     expect(result.symbol).toBe("LoginViewModel");
     expect(result.definitions.length).toBeGreaterThanOrEqual(1);
     expect(result.definitions.some((d) => d.symbol === "LoginViewModel")).toBe(true);
+    expect(result.definitions[0].id).toBeDefined();
+    expect(result.definitions[0].language).toBe("kotlin");
+    expect(result.definitions[0].signature).toContain("LoginViewModel");
   });
 
   it("finds definitions + usages with deduplication", async () => {
@@ -287,6 +356,55 @@ describe("lookup()", () => {
     } finally {
       db.close();
     }
+  });
+});
+
+// ===========================================================================
+// source()
+// ===========================================================================
+
+describe("source()", () => {
+  it("finds exact source by chunkId with surrounding context", async () => {
+    const result = await source({ chunkId: "c-exact-source", before: 2, after: 2 }, ctx({ repoPath: tmpDir }));
+
+    expect(result.chunkId).toBe("c-exact-source");
+    expect(result.before).toBe(2);
+    expect(result.after).toBe(2);
+    expect(result.chunks).toHaveLength(1);
+    expect(result.chunks[0].symbol).toBe("buildPayload");
+    expect(result.chunks[0].source).toContain("const normalized = input.trim()");
+    expect(result.chunks[0].beforeContext?.text).toContain('const prefix = "cw";');
+    expect(result.chunks[0].afterContext?.text).toContain("export function other(): Payload {");
+  });
+
+  it("finds source by symbol", async () => {
+    const result = await source({ symbol: "buildPayload" }, ctx({ repoPath: tmpDir }));
+
+    expect(result.symbol).toBe("buildPayload");
+    expect(result.chunks).toHaveLength(1);
+    expect(result.chunks[0].id).toBe("c-exact-source");
+  });
+
+  it("records telemetry in tool_calls", async () => {
+    await source({ symbol: "buildPayload" }, ctx({ repoPath: tmpDir }));
+
+    const db = openDb(dbPath);
+    try {
+      const row = db
+        .prepare("SELECT * FROM tool_calls WHERE tool = 'source' ORDER BY id DESC LIMIT 1")
+        .get() as { tool: string; repo_path: string; metadata: string };
+      expect(row.tool).toBe("source");
+      expect(row.repo_path).toBe(tmpDir);
+      const meta = JSON.parse(row.metadata) as { symbol: string; chunkCount: number };
+      expect(meta.symbol).toBe("buildPayload");
+      expect(meta.chunkCount).toBe(1);
+    } finally {
+      db.close();
+    }
+  });
+
+  it("rejects requests without chunkId or symbol", async () => {
+    await expect(source({}, ctx())).rejects.toThrow("Provide chunkId or symbol");
   });
 });
 
@@ -354,8 +472,10 @@ describe("health()", () => {
   });
 
   it("returns empty for repo with no chunks", async () => {
-    // tmpDir has no chunks in the DB for its path
-    const result = await health(ctx({ repoPath: tmpDir }));
+    const emptyRepo = join(tmpDir, "empty-repo");
+    mkdirSync(emptyRepo, { recursive: true });
+
+    const result = await health(ctx({ repoPath: emptyRepo }));
 
     expect(result.status).toBe("empty");
   });
@@ -394,6 +514,18 @@ describe("search()", () => {
 
     expect(result.results.length).toBeGreaterThanOrEqual(1);
     expect(result.totalTokens).toBeGreaterThan(0);
+    expect(result.results[0].id).toBe("c1");
+    expect(result.results[0].module).toBe(":app");
+    expect(result.results[0].language).toBe("kotlin");
+    expect(result.results[0].signature).toContain("LoginViewModel");
+    expect(result.results[0].uses).toContain("AuthRepository");
+  });
+
+  it("supports implementation view with focused highlights", async () => {
+    const result = await search({ query: "login", view: "implementation" }, ctx());
+
+    expect(result.results[0].snippet).toContain("class LoginViewModel @Inject constructor() : ViewModel()");
+    expect(result.results[0].highlights).toContain("fun login() {}");
   });
 
   it("records enriched telemetry with timing and retrieval metadata", async () => {
@@ -407,6 +539,8 @@ describe("search()", () => {
       const meta = JSON.parse(row.metadata) as Record<string, unknown>;
       expect(meta).toHaveProperty("timing");
       expect(meta).toHaveProperty("retrieval");
+      expect(meta).toHaveProperty("rewrite");
+      expect(meta).toHaveProperty("rerank");
       expect(meta).toHaveProperty("packager");
       expect(meta).toHaveProperty("topScores");
     } finally {
@@ -422,6 +556,16 @@ describe("search()", () => {
         vectorCandidates: 0,
         candidatesBeforeFusion: 0,
         rrfK: 60,
+        rerankedCount: 0,
+        query: {
+          terms: [],
+          exactTerms: [],
+          expansions: [],
+          aliasesUsed: [],
+          variants: [],
+          languageHints: [],
+          kindHints: [],
+        },
         scores: [],
       },
     });
@@ -436,6 +580,58 @@ describe("search()", () => {
 // ===========================================================================
 // exportData()
 // ===========================================================================
+
+describe("statistics()", () => {
+  it("returns text report plus structured dashboard data", async () => {
+    const statsRepo = join(tmpDir, "stats-repo");
+    mkdirSync(statsRepo, { recursive: true });
+
+    const statsDb = openDb(dbPath);
+    try {
+      recordToolCall(statsDb, {
+        tool: "lookup",
+        repo_path: statsRepo,
+        duration_ms: 42,
+        tokens_sent: 200,
+        tokens_raw: 800,
+        channel: "test",
+        metadata: { symbol: "LoginViewModel" },
+      });
+      recordToolCall(statsDb, {
+        tool: "search",
+        repo_path: statsRepo,
+        duration_ms: 100,
+        tokens_sent: 500,
+        tokens_raw: 3000,
+        channel: "test",
+        metadata: { query: "login", resultCount: 3 },
+      });
+    } finally {
+      statsDb.close();
+    }
+
+    const result = await statistics({ period: "all", format: "json" }, ctx({ repoPath: statsRepo }));
+
+    expect(result.format).toBe("json");
+    expect(result.report).toContain("Scrooge Statistics");
+    expect(result.data.repo.path).toBe(statsRepo);
+    expect(result.data.totals).toEqual({
+      totalCalls: 2,
+      tokensDelivered: 700,
+      rawEquivalent: 3800,
+      tokensSaved: 3100,
+      savingsPct: 81.6,
+    });
+    expect(result.data.usageByTool.map((tool) => tool.tool)).toEqual(["lookup", "search"]);
+    expect(result.data.searchInsights).toEqual({
+      callCount: 1,
+      avgResults: 3,
+      avgTokens: 500,
+      sourceCounts: { lexical: 0, vector: 0, both: 0 },
+      sourceMixPct: { lexical: 0, vector: 0, both: 0 },
+    });
+  });
+});
 
 describe("exportData()", () => {
   it("exports seeded tool_calls as JSONL", async () => {
